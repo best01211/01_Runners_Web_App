@@ -22,6 +22,22 @@ export async function POST(request: Request) {
     password: v.password,
     options: { emailRedirectTo: `${origin}/auth/callback`, data: { login_id: v.loginId, name: v.name, nickname: v.nickname, phone: v.phone, birth_date: v.birthDate } },
   });
-  if (error) return fail("SIGNUP_FAILED", "회원가입에 실패했습니다.", 400);
+  if (error) {
+    console.error("Supabase signup error:", {
+      name: error.name,
+      message: error.message,
+      status: error.status,
+      code: error.code,
+    });
+
+    return fail(
+      "SIGNUP_FAILED",
+      error.message,
+      error.status ?? 400,
+      {
+        code: error.code,
+      },
+    );
+  }
   return ok({ userId: data.user?.id, approvalStatus: "pending", emailConfirmationRequired: data.session === null }, 201);
 }
