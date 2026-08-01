@@ -1,9 +1,5 @@
 {
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/auth/logout/route": "app/api/auth/logout/route.js",
-  "/api/staff/members/[userId]/approval/route": "app/api/staff/members/[userId]/approval/route.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/login/page": "app/login/page.js",
-  "/page": "app/page.js",
-  "/staff/members/pending/page": "app/staff/members/pending/page.js"
+  "/api/schedules/[scheduleId]/route": "app/api/schedules/[scheduleId]/route.js",
+  "/schedules/[scheduleId]/page": "app/schedules/[scheduleId]/page.js",
+  "/schedules/page": "app/schedules/page.js"
 }
