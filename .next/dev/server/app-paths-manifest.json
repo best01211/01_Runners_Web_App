@@ -1,5 +1,1 @@
-{
-  "/api/schedules/[scheduleId]/route": "app/api/schedules/[scheduleId]/route.js",
-  "/schedules/[scheduleId]/page": "app/schedules/[scheduleId]/page.js",
-  "/schedules/page": "app/schedules/page.js"
-}
+{}
