@@ -35,14 +35,16 @@ export async function GET(_request: Request,{params}:Context){
   return ok({participation:data});
 }
 
-export async function POST(_request: Request,{params}:Context){
+export async function POST(request: Request,{params}:Context){
   const profile=await getCurrentProfile();
   if(!profile) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
   const {scheduleId}=await params;
   const supabase=await createSupabaseServerClient();
+  let paceGroupId:string|null=null;try{const body=await request.json();paceGroupId=String(body.paceGroupId??"")||null;}catch{}
   const {data,error}=await supabase.rpc("register_schedule_participation",{target_schedule_id:scheduleId});
   if(error){ const [c,m,s]=mapError(error.message); return fail(c,m,s); }
-  return ok({participation:data},201);
+  if(paceGroupId)await supabase.from("schedule_participations").update({pace_group_id:paceGroupId}).eq("participation_id",data.participation_id);
+  return ok({participation:{...data,pace_group_id:paceGroupId}},201);
 }
 
 export async function DELETE(request: Request,{params}:Context){

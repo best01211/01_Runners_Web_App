@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   const { data: profile, error } = await admin.from("profiles").select("user_id,email,role,account_status,approval_status").eq("login_id", loginId).maybeSingle();
   if (error) return fail("DATABASE_ERROR", "로그인 처리 중 오류가 발생했습니다.", 500);
   if (!profile) return fail("INVALID_CREDENTIALS", "아이디 또는 비밀번호가 올바르지 않습니다.", 401);
+  if (profile.approval_status !== "approved" || profile.role === "pending") return fail("APPROVAL_REQUIRED", "회원 승인 후 로그인할 수 있습니다.", 403);
   if (profile.account_status !== "active") return fail("ACCOUNT_UNAVAILABLE", "현재 이용할 수 없는 계정입니다.", 403);
   const supabase = await createSupabaseServerClient();
   const signed = await supabase.auth.signInWithPassword({ email: profile.email, password });

@@ -1,57 +1,8 @@
 "use client";
-
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-export function ScheduleForm({ initial }: { initial?: any }) {
-  const router = useRouter();
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const editing = Boolean(initial?.schedule_id);
-
-  async function submit(formData: FormData) {
-    setLoading(true);
-    setMessage("");
-    const body = {
-      title: formData.get("title"),
-      description: formData.get("description"),
-      scheduleType: formData.get("scheduleType"),
-      location: formData.get("location"),
-      startAt: formData.get("startAt"),
-      registrationEndAt: formData.get("registrationEndAt"),
-      capacity: formData.get("capacity"),
-      guestAllowed: formData.get("guestAllowed") === "on",
-      commentEnabled: formData.get("commentEnabled") === "on",
-    };
-
-    const response = await fetch(editing ? `/api/schedules/${initial.schedule_id}` : "/api/schedules", {
-      method: editing ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const result = await response.json();
-    setLoading(false);
-    if (!response.ok) return setMessage(result.error?.message ?? "저장에 실패했습니다.");
-    router.push(`/schedules/${result.data.schedule.schedule_id}`);
-    router.refresh();
-  }
-
-  const local = (value?: string) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
-
-  return <form action={submit} className="space-y-5">
-    <input name="title" defaultValue={initial?.title} placeholder="일정 제목" required className="w-full rounded-xl border p-3" />
-    <select name="scheduleType" defaultValue={initial?.schedule_type ?? "regular"} className="w-full rounded-xl border p-3">
-      <option value="regular">정기런</option><option value="training">훈련</option><option value="flash">번개런</option><option value="event">행사</option>
-    </select>
-    <textarea name="description" defaultValue={initial?.description} placeholder="일정 설명" rows={5} className="w-full rounded-xl border p-3" />
-    <input name="location" defaultValue={initial?.location} placeholder="장소" required className="w-full rounded-xl border p-3" />
-    <div className="grid gap-4 md:grid-cols-2">
-      <label>시작 일시<input type="datetime-local" name="startAt" defaultValue={local(initial?.start_at)} required className="mt-2 w-full rounded-xl border p-3" /></label>
-      <label>신청 마감<input type="datetime-local" name="registrationEndAt" defaultValue={local(initial?.registration_end_at)} required className="mt-2 w-full rounded-xl border p-3" /></label>
-    </div>
-    <input type="number" min="1" name="capacity" defaultValue={initial?.capacity ?? ""} placeholder="정원(선택)" className="w-full rounded-xl border p-3" />
-    <div className="flex gap-6"><label><input type="checkbox" name="guestAllowed" defaultChecked={initial?.guest_allowed} /> 게스트 허용</label><label><input type="checkbox" name="commentEnabled" defaultChecked={initial?.comment_enabled ?? true} /> 댓글 사용</label></div>
-    {message && <p className="text-red-600">{message}</p>}
-    <button disabled={loading} className="w-full rounded-xl bg-emerald-600 p-3 font-bold text-white">{loading ? "저장 중..." : editing ? "일정 수정" : "일정 생성"}</button>
-  </form>;
-}
+import { useRouter } from "next/navigation"; import { useState } from "react";
+type Initial=Record<string,unknown>&{schedule_id?:string};
+export function ScheduleForm({initial}:{initial?:Initial}){const router=useRouter();const[message,setMessage]=useState("");const[loading,setLoading]=useState(false);const editing=Boolean(initial?.schedule_id);const local=(v:unknown)=>typeof v==="string"?new Date(new Date(v).getTime()-new Date(v).getTimezoneOffset()*60000).toISOString().slice(0,16):"";
+ async function upload(file:File|null){if(!file||!file.size)return null;const f=new FormData();f.set("file",file);const r=await fetch("/api/uploads",{method:"POST",body:f});const j=await r.json();if(!r.ok)throw new Error(j.error?.message);return j.data.url as string;}
+ async function submit(f:FormData){setLoading(true);setMessage("");try{const imageUrl=await upload(f.get("image") as File),courseImageUrl=await upload(f.get("courseImage") as File);const body={title:f.get("title"),description:f.get("description"),scheduleType:f.get("scheduleType"),location:f.get("location"),startAt:f.get("startAt"),endAt:f.get("endAt"),registrationStartAt:f.get("registrationStartAt"),registrationEndAt:f.get("registrationEndAt"),capacity:f.get("capacity"),guestAllowed:f.get("guestAllowed")==="on",commentEnabled:f.get("commentEnabled")==="on",staffInCapacity:f.get("staffInCapacity")==="on",imageUrl:imageUrl??initial?.image_url,courseImageUrl:courseImageUrl??initial?.course_image_url};const r=await fetch(editing?`/api/schedules/${initial?.schedule_id}`:"/api/schedules",{method:editing?"PATCH":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.error?.message??"저장에 실패했습니다.");router.push(`/schedules/${j.data.schedule.schedule_id}`);router.refresh();}catch(e){setMessage(e instanceof Error?e.message:"저장에 실패했습니다.");}finally{setLoading(false);}}
+ return <form action={submit} className="space-y-5"><input name="title" defaultValue={String(initial?.title??"")} placeholder="일정 제목" required className="input"/><select name="scheduleType" defaultValue={String(initial?.schedule_type??"regular")} className="input"><option value="regular">정기런</option><option value="training">훈련</option><option value="flash">번개런</option><option value="event">이벤트</option></select><textarea name="description" defaultValue={String(initial?.description??"")} placeholder="상세 설명" rows={5} className="input"/><input name="location" defaultValue={String(initial?.location??"")} placeholder="장소" required className="input"/><div className="grid gap-4 sm:grid-cols-2"><Dt n="startAt" l="시작" v={local(initial?.start_at)}/><Dt n="endAt" l="종료" v={local(initial?.end_at)}/><Dt n="registrationStartAt" l="모집 시작" v={local(initial?.registration_start_at)} optional/><Dt n="registrationEndAt" l="모집 종료" v={local(initial?.registration_end_at)}/></div><input type="number" min="1" name="capacity" defaultValue={String(initial?.capacity??"")} placeholder="정원 (선택)" className="input"/><div className="grid gap-3 text-sm sm:grid-cols-3"><Check n="guestAllowed" l="게스트 허용" v={Boolean(initial?.guest_allowed)}/><Check n="commentEnabled" l="댓글 사용" v={initial?.comment_enabled!==false}/><Check n="staffInCapacity" l="운영진 정원 포함" v={initial?.staff_in_capacity!==false}/></div><label className="block text-sm font-semibold">대표 이미지<input type="file" name="image" accept="image/png,image/jpeg,image/webp" className="mt-2 block"/></label><label className="block text-sm font-semibold">코스 이미지<input type="file" name="courseImage" accept="image/png,image/jpeg,image/webp" className="mt-2 block"/></label>{message&&<p className="text-red-600">{message}</p>}<button disabled={loading} className="w-full rounded-xl bg-emerald-600 p-3 font-bold text-white">{loading?"저장 중...":editing?"일정 수정":"일정 생성"}</button></form>}
+function Dt({n,l,v,optional=false}:{n:string;l:string;v:string;optional?:boolean}){return <label className="text-sm font-semibold">{l}<input type="datetime-local" name={n} defaultValue={v} required={!optional} className="input mt-2"/></label>} function Check({n,l,v}:{n:string;l:string;v:boolean}){return <label><input type="checkbox" name={n} defaultChecked={v}/> {l}</label>}

@@ -9,7 +9,7 @@ export function ParticipationPanel(props:Props){
   const router=useRouter();
   const [loading,setLoading]=useState(false);
   const [message,setMessage]=useState("");
-  const now=Date.now();
+  const [now]=useState(() => Date.now());
   const started=!props.registrationStartAt || now>=new Date(props.registrationStartAt).getTime();
   const open=props.scheduleStatus==="open" && started && now<=new Date(props.registrationEndAt).getTime();
   const full=props.capacity!==null && props.participantCount>=props.capacity;

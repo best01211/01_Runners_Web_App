@@ -13,7 +13,11 @@ export default async function DashboardPage() {
       </header>
       <section className="mt-10 grid gap-4 md:grid-cols-2">
         <article className="rounded-2xl border p-6"><h2 className="text-lg font-bold">회원 정보</h2><p className="mt-3 text-zinc-600">역할: {profile.role} · 승인: {profile.approval_status}</p></article>
+        <Link href="/schedules" className="rounded-2xl border p-6"><h2 className="text-lg font-bold">일정</h2><p className="mt-3 text-zinc-600">러닝과 이벤트를 확인합니다.</p></Link>
+        <Link href="/leaderboard" className="rounded-2xl border p-6"><h2 className="text-lg font-bold">랭킹</h2><p className="mt-3 text-zinc-600">시즌 활동 순위를 확인합니다.</p></Link>
+        <Link href="/profile" className="rounded-2xl border p-6"><h2 className="text-lg font-bold">내 정보</h2><p className="mt-3 text-zinc-600">개인정보와 프로필을 관리합니다.</p></Link>
         {isStaffOrAdmin(profile) && <Link href="/staff/members/pending" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6"><h2 className="text-lg font-bold">가입 승인 관리</h2><p className="mt-3">승인 대기 회원을 확인합니다.</p></Link>}
+        {profile.role === "admin" && <Link href="/admin" className="rounded-2xl bg-zinc-950 p-6 text-white"><h2 className="text-lg font-bold">관리자</h2><p className="mt-3 text-zinc-300">회원과 운영 정책을 관리합니다.</p></Link>}
       </section>
     </main>
   );

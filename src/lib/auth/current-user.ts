@@ -9,6 +9,8 @@ export type CurrentProfile = {
   role: "pending" | "guest" | "member" | "staff" | "admin";
   account_status: "active" | "restricted" | "suspended" | "withdrawn";
   approval_status: "pending" | "approved" | "rejected" | "cancelled";
+  staff_position: "staff" | "vice_president" | "president" | null;
+  profile_image_url: string | null;
 };
 
 export async function getCurrentProfile(): Promise<CurrentProfile | null> {
@@ -19,7 +21,7 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
     .from("profiles")
-    .select("user_id,login_id,name,nickname,role,account_status,approval_status")
+    .select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -28,6 +30,15 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
     return null;
   }
   return data as CurrentProfile | null;
+}
+
+export function publicName(profile: Pick<CurrentProfile, "nickname" | "login_id">) {
+  return profile.nickname?.trim() || profile.login_id;
+}
+
+export function canManageStaff(profile: CurrentProfile | null) {
+  return profile?.role === "admin" ||
+    (profile?.role === "staff" && ["president", "vice_president"].includes(profile.staff_position ?? ""));
 }
 
 export function isStaffOrAdmin(profile: CurrentProfile | null) {

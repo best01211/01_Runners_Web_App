@@ -1,0 +1,3 @@
+"use client";
+import { useRouter } from "next/navigation";
+export function WithdrawalActions({requestId}:{requestId:string}){const router=useRouter();async function decide(decision:"approve"|"reject"){if(!confirm(decision==="approve"?"탈퇴를 승인하고 개인정보를 삭제할까요?":"탈퇴 신청을 반려할까요?"))return;const r=await fetch(`/api/admin/withdrawals/${requestId}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({decision})}),j=await r.json();if(!r.ok)alert(j.error?.message);router.refresh()}return <div className="flex gap-2"><button onClick={()=>decide("approve")} className="rounded-lg bg-red-600 px-3 py-2 text-sm font-bold text-white">승인</button><button onClick={()=>decide("reject")} className="rounded-lg border px-3 py-2 text-sm font-bold">반려</button></div>}

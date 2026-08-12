@@ -1,9 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  return <Suspense fallback={<main className="flex min-h-screen items-center justify-center">불러오는 중...</main>}><LoginForm /></Suspense>;
+}
+
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 

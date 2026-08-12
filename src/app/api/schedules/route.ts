@@ -42,5 +42,8 @@ export async function POST(request: Request) {
     console.error(error);
     return fail("SCHEDULE_CREATE_FAILED", "일정 생성에 실패했습니다.", 500);
   }
+  if (data.schedule_type === "flash") {
+    await admin.from("schedule_participations").insert({ schedule_id: data.schedule_id, user_id: profile.user_id, status: "registered", registration_source: "creator" });
+  }
   return ok({ schedule: data }, 201);
 }
