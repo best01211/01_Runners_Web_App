@@ -26,3 +26,10 @@ body {
 }
 
 @layer components { .input { @apply w-full rounded-xl border border-zinc-300 bg-white p-3 outline-none focus:border-emerald-500; } }
+
+/* Keep geography quiet while preserving the contrast of course and runner overlays. */
+.tracking-map .leaflet-tile-pane { filter: grayscale(1) brightness(1.1) contrast(.8); opacity: .28; }
+.tracking-map .leaflet-control-attribution { background: rgba(255,255,255,.9); font-size: 10px; }
+.tracking-map .tracking-distance-label { background: transparent; border: 0; box-shadow: none; color: #17465c; font-weight: 800; font-size: 11px; }
+.tracking-map .tracking-distance-label::before { display: none; }
+.tracking-map .leaflet-tooltip:not(.tracking-distance-label) { border-radius: 12px; padding: 6px 10px; font-weight: 700; }

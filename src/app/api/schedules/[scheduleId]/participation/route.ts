@@ -1,6 +1,7 @@
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Context = { params: Promise<{ scheduleId: string }> };
 
@@ -57,4 +58,23 @@ export async function DELETE(request: Request,{params}:Context){
   const {data,error}=await supabase.rpc("cancel_schedule_participation",{target_schedule_id:scheduleId,reason_text:reason||null});
   if(error){ const [c,m,s]=mapError(error.message); return fail(c,m,s); }
   return ok({participation:data});
+}
+
+export async function PATCH(request: Request,{params}:Context){
+  const profile=await getCurrentProfile();
+  if(!profile) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
+  const {scheduleId}=await params;
+  let paceGroupId="";
+  try{paceGroupId=String((await request.json()).paceGroupId??"");}catch{return fail("INVALID_JSON","요청 형식이 올바르지 않습니다.");}
+  const supabase=await createSupabaseServerClient();
+  const [{data:group},{data:participation},{data:schedule}]=await Promise.all([
+    supabase.from("pace_groups").select("pace_group_id").eq("pace_group_id",paceGroupId).eq("schedule_id",scheduleId).maybeSingle(),
+    supabase.from("schedule_participations").select("participation_id,pace_change_locked").eq("schedule_id",scheduleId).eq("user_id",profile.user_id).eq("status","registered").maybeSingle(),
+    supabase.from("schedules").select("attendance_opened_at").eq("schedule_id",scheduleId).maybeSingle(),
+  ]);
+  if(!group) return fail("INVALID_PACE_GROUP","페이스 그룹을 찾을 수 없습니다.",404);
+  if(!participation) return fail("NOT_PARTICIPATING","참가 신청을 먼저 해주세요.",409);
+  if(participation.pace_change_locked||schedule?.attendance_opened_at) return fail("PACE_CHANGE_LOCKED","출석 시작 후에는 그룹을 변경할 수 없습니다.",409);
+  const {data,error}=await createSupabaseAdminClient().from("schedule_participations").update({pace_group_id:paceGroupId}).eq("participation_id",participation.participation_id).select().single();
+  return error?fail("PACE_CHANGE_FAILED","그룹 변경에 실패했습니다.",500):ok({participation:data});
 }

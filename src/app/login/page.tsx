@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -38,7 +39,7 @@ function LoginForm() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        setErrorMessage(result.message ?? "로그인에 실패했습니다.");
+        setErrorMessage(result.error?.message ?? "로그인에 실패했습니다.");
         return;
       }
 
@@ -61,7 +62,7 @@ function LoginForm() {
         </h1>
 
         <p className="mt-2 text-center text-sm text-gray-500">
-          가입한 아이디와 비밀번호를 입력해 주세요.
+          이메일이 아닌 회원 아이디와 비밀번호를 입력해 주세요.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -106,7 +107,7 @@ function LoginForm() {
           </div>
 
           {errorMessage && (
-            <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+            <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
               {errorMessage}
             </p>
           )}
@@ -119,6 +120,7 @@ function LoginForm() {
             {isSubmitting ? "로그인 중..." : "로그인"}
           </button>
         </form>
+        <Link href="/auth/forgot-password" className="mt-5 block text-center text-sm font-semibold text-emerald-700">비밀번호를 잊으셨나요?</Link>
       </section>
     </main>
   );

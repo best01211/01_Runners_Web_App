@@ -1,2 +1,0 @@
-{"timestamp":"00:00:48.634","source":"Server","level":"WARN","message":"⚠ Slow filesystem detected. The benchmark took 970ms. If D:\\Git\\01_Runners_Web_App\\.next/dev is a network drive, consider moving it to a local folder.\nSee more: https://nextjs.org/docs/app/guides/local-development"}
-{"timestamp":"00:00:54.260","source":"Server","level":"LOG","message":"○ Compiling proxy ..."}

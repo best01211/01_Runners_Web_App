@@ -3,6 +3,7 @@
 
 # next.js
 /.next/
+/.next-webpack/
 /out/
 
 # production
@@ -17,3 +18,7 @@
 .env.local
 .env.development.local
 .env.production.local
+
+# Local dependency cache
+.npm-cache/
+.test-output/

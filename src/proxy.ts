@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/login", "/signup", "/auth/callback"]);
+const PUBLIC_PATHS = new Set(["/login", "/signup", "/auth/callback", "/auth/forgot-password", "/auth/reset-password"]);
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.has(pathname) ||
@@ -29,6 +29,8 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
+  // Recovery routes must remain reachable even for pending or restricted accounts.
+  if (["/auth/forgot-password", "/auth/reset-password", "/auth/callback"].includes(pathname)) return response;
 
   if (!user) {
     if (isPublicPath(pathname)) return response;
@@ -59,6 +61,14 @@ export async function proxy(request: NextRequest) {
     if (pathname === "/pending" || pathname.startsWith("/api/auth/")) return response;
     return NextResponse.redirect(new URL("/pending", request.url));
   }
+
+  const { data: maintenance } = await supabase.from("system_settings").select("setting_value").eq("setting_key", "maintenance").maybeSingle();
+  const serviceStatus = String((maintenance?.setting_value as { status?: string } | null)?.status ?? "normal");
+  if (serviceStatus !== "normal" && profile.role !== "admin") {
+    if (pathname === "/maintenance" || pathname.startsWith("/api/auth/")) return response;
+    return NextResponse.redirect(new URL("/maintenance", request.url));
+  }
+  if (pathname === "/maintenance" && serviceStatus === "normal") return NextResponse.redirect(new URL("/dashboard", request.url));
 
   if (["/pending", "/login", "/signup"].includes(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));

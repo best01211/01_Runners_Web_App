@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"],
+    "rootDir": ".",
+    "outDir": ".test-output/race-tracking"
+  },
+  "include": ["src/lib/race-tracking/**/*.ts", "tests/race-tracking/**/*.ts"]
+}

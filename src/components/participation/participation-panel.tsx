@@ -1,54 +1,13 @@
 "use client";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
-type Participation = { participation_id:string; status:string; participation_locked:boolean } | null;
-type Props = { scheduleId:string; scheduleStatus:string; participantCount:number; capacity:number|null; registrationStartAt:string|null; registrationEndAt:string; cancellationDeadlineAt:string|null; participation:Participation; canParticipate:boolean };
+type Group={pace_group_id:string;pace_seconds:number;distance_km:number};
+type Participation={participation_id:string;status:string;participation_locked:boolean;pace_change_locked:boolean;pace_group_id:string|null}|null;
+type Props={scheduleId:string;scheduleType:string;scheduleStatus:string;participantCount:number;capacity:number|null;registrationStartAt:string|null;registrationEndAt:string;cancellationDeadlineAt:string|null;participation:Participation;canParticipate:boolean;paceGroups:Group[];canCreatePaceGroup:boolean};
 
-export function ParticipationPanel(props:Props){
-  const router=useRouter();
-  const [loading,setLoading]=useState(false);
-  const [message,setMessage]=useState("");
-  const [now]=useState(() => Date.now());
-  const started=!props.registrationStartAt || now>=new Date(props.registrationStartAt).getTime();
-  const open=props.scheduleStatus==="open" && started && now<=new Date(props.registrationEndAt).getTime();
-  const full=props.capacity!==null && props.participantCount>=props.capacity;
-
-  async function register(){
-    setLoading(true); setMessage("");
-    try{
-      const r=await fetch(`/api/schedules/${props.scheduleId}/participation`,{method:"POST"});
-      const j=await r.json();
-      if(!r.ok){ setMessage(j.error?.message??"참가 신청에 실패했습니다."); return; }
-      router.refresh();
-    }catch{ setMessage("서버와 통신하지 못했습니다."); }
-    finally{ setLoading(false); }
-  }
-
-  async function cancel(){
-    const reason=window.prompt("참가 취소 사유가 있다면 입력해 주세요.")??"";
-    if(!window.confirm("참가 신청을 취소하시겠습니까?")) return;
-    setLoading(true); setMessage("");
-    try{
-      const r=await fetch(`/api/schedules/${props.scheduleId}/participation`,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({reason})});
-      const j=await r.json();
-      if(!r.ok){ setMessage(j.error?.message??"참가 취소에 실패했습니다."); return; }
-      router.refresh();
-    }catch{ setMessage("서버와 통신하지 못했습니다."); }
-    finally{ setLoading(false); }
-  }
-
-  return <section className="mt-8 rounded-2xl border border-zinc-200 p-6">
-    <div className="flex items-center justify-between gap-4">
-      <div><h2 className="text-xl font-bold">참가</h2><p className="mt-2 text-zinc-600">현재 {props.participantCount}명 참가{props.capacity!==null?` / 정원 ${props.capacity}명`:""}</p></div>
-      {full&&!props.participation&&<span className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700">마감</span>}
-    </div>
-    {!props.participation ? <button type="button" onClick={register} disabled={loading||!props.canParticipate||!open||full} className="mt-6 w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white disabled:bg-zinc-300">
-      {loading?"처리 중...":!props.canParticipate?"참가할 수 없는 계정입니다":!started?"신청 기간 전입니다":!open?"참가 신청 마감":full?"정원 마감":"참가하기"}
-    </button> : <div className="mt-6 space-y-3">
-      <div className="rounded-xl bg-emerald-50 p-4 text-emerald-800">참가 신청 완료 · 상태: {props.participation.status}</div>
-      <button type="button" onClick={cancel} disabled={loading||props.participation.participation_locked||(props.cancellationDeadlineAt!==null&&now>new Date(props.cancellationDeadlineAt).getTime())} className="w-full rounded-xl border border-red-300 px-4 py-3 font-semibold text-red-700 disabled:opacity-50">참가 취소</button>
-    </div>}
-    {message&&<p className="mt-4 text-sm text-red-600">{message}</p>}
-  </section>;
-}
+export function ParticipationPanel(props:Props){const router=useRouter();const[loading,setLoading]=useState(false),[message,setMessage]=useState(""),[selected,setSelected]=useState(props.participation?.pace_group_id??props.paceGroups[0]?.pace_group_id??"");const[now]=useState(()=>Date.now());const started=!props.registrationStartAt||now>=new Date(props.registrationStartAt).getTime(),open=props.scheduleStatus==="open"&&started&&now<=new Date(props.registrationEndAt).getTime(),full=props.capacity!==null&&props.participantCount>=props.capacity;
+ async function request(method:string,body?:object){setLoading(true);setMessage("");try{const r=await fetch(`/api/schedules/${props.scheduleId}/participation`,{method,headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined}),j=await r.json();if(!r.ok)return setMessage(j.error?.message??"참가 처리에 실패했습니다.");router.refresh()}catch{setMessage("서버와 통신하지 못했습니다.")}finally{setLoading(false)}}
+ async function createGroup(e:FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget),minutes=Number(f.get("minutes")),seconds=Number(f.get("seconds")),distanceKm=Number(f.get("distance"));const r=await fetch(`/api/schedules/${props.scheduleId}/pace-groups`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({paceSeconds:minutes*60+seconds,distanceKm})}),j=await r.json();if(!r.ok)return setMessage(j.error?.message??"그룹 생성에 실패했습니다.");e.currentTarget.reset();router.refresh()}
+ const label=(g:Group)=>`${Math.floor(g.pace_seconds/60)}:${String(g.pace_seconds%60).padStart(2,"0")} / ${g.distance_km}km`;
+ return <section className="mt-8 rounded-2xl border p-6"><div className="flex justify-between"><div><h2 className="text-xl font-bold">참가</h2><p className="mt-2 text-zinc-600">현재 {props.participantCount}명{props.capacity!==null?` / 정원 ${props.capacity}명`:""}</p></div>{full&&!props.participation&&<b className="text-red-600">마감</b>}</div>{props.paceGroups.length>0&&<label className="mt-5 block text-sm font-bold">페이스 그룹<select value={selected} onChange={e=>setSelected(e.target.value)} className="input mt-2">{props.paceGroups.map(g=><option key={g.pace_group_id} value={g.pace_group_id}>{label(g)}</option>)}</select></label>}{!props.participation?<button onClick={()=>request("POST",selected?{paceGroupId:selected}:undefined)} disabled={loading||!props.canParticipate||!open||full||(props.scheduleType==="regular"&&props.paceGroups.length===0)} className="mt-5 w-full rounded-xl bg-emerald-600 p-3 font-bold text-white disabled:bg-zinc-300">{loading?"처리 중...":!started?"신청 기간 전입니다":!open?"참가 신청 마감":full?"정원 마감":"참가 신청"}</button>:<div className="mt-5 space-y-3"><div className="rounded-xl bg-emerald-50 p-4 text-emerald-800">참가 신청 완료 · {props.participation.status}</div>{props.paceGroups.length>0&&<button onClick={()=>request("PATCH",{paceGroupId:selected})} disabled={loading||props.participation.pace_change_locked} className="w-full rounded-xl border p-3 font-bold disabled:opacity-40">그룹 변경</button>}<button onClick={()=>{if(confirm("참가 신청을 취소할까요?"))void request("DELETE",{reason:"사용자 취소"})}} disabled={loading||props.participation.participation_locked||(props.cancellationDeadlineAt!==null&&now>new Date(props.cancellationDeadlineAt).getTime())} className="w-full rounded-xl border border-red-300 p-3 font-bold text-red-700 disabled:opacity-40">참가 취소</button></div>}{props.canCreatePaceGroup&&props.scheduleType==="flash"&&<form onSubmit={createGroup} className="mt-6 grid grid-cols-4 gap-2 border-t pt-5"><input name="minutes" type="number" min="1" required className="input" placeholder="분"/><select name="seconds" className="input"><option value="0">00초</option><option value="30">30초</option></select><input name="distance" type="number" min="5" step="5" required className="input" placeholder="거리 km"/><button className="rounded-xl bg-zinc-900 text-sm font-bold text-white">그룹 추가</button></form>}{message&&<p className="mt-4 text-sm text-red-600">{message}</p>}</section>}
