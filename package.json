@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:tracking": "node scripts/test-tracking.mjs",
-    "test:auth": "node scripts/test-auth.mjs"
+    "test:auth": "node scripts/test-auth.mjs",
+    "test:release": "node scripts/test-release.mjs",
+    "test:release-db": "node scripts/test-release-database.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

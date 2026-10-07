@@ -2,6 +2,7 @@ import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { validateSchedulePayload } from "@/lib/validation/schedule";
+import { canEditScheduleType } from "@/lib/validation/schedule-permissions";
 
 type Context = { params: Promise<{ scheduleId: string }> };
 
@@ -31,6 +32,7 @@ export async function PATCH(request: Request, { params }: Context) {
   try { body = await request.json(); } catch { return fail("INVALID_JSON", "요청 형식이 올바르지 않습니다.", 400); }
   const parsed = validateSchedulePayload(body);
   if ("error" in parsed) return fail("VALIDATION_ERROR", parsed.error!, 400);
+  if (!canEditScheduleType(profile.role, parsed.value!.schedule_type)) return fail("FORBIDDEN", "일반 회원은 번개런만 수정할 수 있습니다.", 403);
 
   const { data, error } = await admin.from("schedules").update(parsed.value!).eq("schedule_id", scheduleId).select().single();
   if (error) return fail("SCHEDULE_UPDATE_FAILED", "일정 수정에 실패했습니다.", 500);

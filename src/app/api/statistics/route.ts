@@ -1,1 +1,11 @@
-import{fail,ok}from"@/lib/api-response";import{getCurrentProfile,publicName}from"@/lib/auth/current-user";import{createSupabaseAdminClient}from"@/lib/supabase/admin";export async function GET(){const p=await getCurrentProfile();if(!p)return fail("UNAUTHORIZED","로그인이 필요합니다.",401);const a=createSupabaseAdminClient();const{data}=await a.from("attendances").select("user_id,status,profiles!inner(login_id,nickname,role,account_status,ranking_excluded)").in("status",["attended","late","absent"]);const map=new Map<string,{userId:string;name:string;attended:number;late:number;absent:number;score:number}>();for(const x of data??[]){const q=Array.isArray(x.profiles)?x.profiles[0]:x.profiles;if(!q||q.role==="admin"||q.account_status!=="active"||q.ranking_excluded)continue;const v=map.get(x.user_id)??{userId:x.user_id,name:publicName(q),attended:0,late:0,absent:0,score:0};if(x.status==="attended"){v.attended++;v.score+=10}if(x.status==="late"){v.late++;v.score+=7}if(x.status==="absent")v.absent++;map.set(x.user_id,v)}const ranking=[...map.values()].sort((a,b)=>b.score-a.score||b.attended-a.attended);return ok({ranking,me:ranking.find(x=>x.userId===p.user_id)??null})}
+import { fail, ok } from "@/lib/api-response";
+import { getCurrentProfile } from "@/lib/auth/current-user";
+import { loadRanking } from "@/lib/ranking-server";
+export async function GET(request: Request) {
+ const p = await getCurrentProfile();
+ if (!p) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+ try {
+  const data = await loadRanking(new URL(request.url).searchParams.get("seasonId"),p.role === "admin");
+  return ok({ ...data, me: data.ranking.find(row => row.userId === p.user_id) ?? null });
+ } catch (error) { return fail("RANKING_FAILED", error instanceof Error ? error.message : "랭킹 조회에 실패했습니다.", 500); }
+}

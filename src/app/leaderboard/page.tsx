@@ -1,1 +1,16 @@
-import{redirect}from"next/navigation";import{getCurrentProfile}from"@/lib/auth/current-user";import{createSupabaseAdminClient}from"@/lib/supabase/admin";export default async function Page(){const p=await getCurrentProfile();if(!p)redirect("/login");const a=createSupabaseAdminClient(),{data}=await a.from("attendances").select("user_id,status,profiles!inner(login_id,nickname,role,account_status,ranking_excluded)").in("status",["attended","late","absent"]);const m=new Map<string,{name:string;score:number;attended:number;late:number;total:number}>();for(const x of data??[]){const q=Array.isArray(x.profiles)?x.profiles[0]:x.profiles;if(!q||q.role==="admin"||q.account_status!=="active"||q.ranking_excluded)continue;const v=m.get(x.user_id)??{name:q.nickname||q.login_id,score:0,attended:0,late:0,total:0};v.total++;if(x.status==="attended"){v.attended++;v.score+=10}if(x.status==="late"){v.late++;v.score+=7}m.set(x.user_id,v)}const rows=[...m.values()].sort((a,b)=>b.score-a.score||b.attended-a.attended);return <main className="mx-auto min-h-screen max-w-4xl px-6 py-12"><h1 className="text-3xl font-black">활동 랭킹</h1><div className="mt-8 space-y-2">{rows.map((x,i)=><div key={x.name} className="grid grid-cols-[60px_1fr_repeat(3,80px)] rounded-xl bg-zinc-50 p-4"><b>{i+1}위</b><b>{x.name}</b><span>{x.score}점</span><span>출석 {x.attended}</span><span>{x.total?Math.round((x.attended+x.late)/x.total*100):0}%</span></div>)}</div></main>}
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentProfile } from "@/lib/auth/current-user";
+import { loadRanking } from "@/lib/ranking-server";
+export default async function Page({ searchParams }: { searchParams: Promise<{ seasonId?: string }> }) {
+ const p = await getCurrentProfile();
+ if (!p) redirect("/login");
+ const params = await searchParams;
+ let data;
+ try { data = await loadRanking(params.seasonId,p.role === "admin"); }
+ catch (error) { return <main className="mx-auto max-w-4xl px-6 py-12"><h1 className="text-3xl font-black">활동 랭킹</h1><p role="alert" className="mt-6">{error instanceof Error ? error.message : "조회에 실패했습니다."}</p><Link href="/leaderboard">기본 시즌으로 돌아가기</Link></main>; }
+ return <main className="mx-auto min-h-screen max-w-4xl px-6 py-12"><header className="flex justify-between"><h1 className="text-3xl font-black">활동 랭킹</h1><Link href="/dashboard">대시보드</Link></header>
+ <form className="mt-6 flex gap-2"><select name="seasonId" defaultValue={data.season?.season_id ?? ""} className="input"><option value="">기본 시즌</option>{data.seasons.map(s => <option key={s.season_id} value={s.season_id}>{s.name}</option>)}</select><button className="shrink-0 rounded-xl border px-4">조회</button></form>
+ <p className="mt-4 text-sm text-zinc-600">{data.season ? `${data.season.name} · ${data.season.starts_on} ~ ${data.season.ends_on}` : "기본 시즌이 없어 전체 기간을 표시합니다."} · 출석 {data.policy.attended}점 · 지각 {data.policy.late}점 · 불참 {data.policy.absent}점 · 페이서 추가 {data.policy.pacer}점 · 최소 활동 {data.policy.minimumAttendance}회</p>
+ <div className="mt-8 space-y-2">{data.ranking.length === 0 && <p>조건에 맞는 활동 기록이 없습니다.</p>}{data.ranking.map((row,i) => <div key={row.userId} className="flex flex-wrap justify-between gap-3 rounded-xl bg-zinc-50 p-4"><b>{i+1}위 · {row.name}</b><span>{row.score}점</span><span>출석 {row.attended} · 지각 {row.late}</span><span>출석률 {row.attendanceRate}%</span></div>)}</div></main>;
+}

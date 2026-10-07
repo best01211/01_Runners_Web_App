@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","module":"CommonJS","moduleResolution":"Node","esModuleInterop":true,"strict":true,"skipLibCheck":true,"rootDir":".","outDir":".test-output/release"},"include":["src/lib/ranking.ts","src/lib/validation/schedule-permissions.ts","tests/release/**/*.ts"]}

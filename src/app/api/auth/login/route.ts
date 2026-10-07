@@ -15,7 +15,9 @@ export async function POST(request: Request) {
   if (profile.approval_status !== "approved" || profile.role === "pending") return fail("APPROVAL_REQUIRED", "회원 승인 후 로그인할 수 있습니다.", 403);
   if (profile.account_status !== "active") return fail("ACCOUNT_UNAVAILABLE", "현재 이용할 수 없는 계정입니다.", 403);
   const supabase = await createSupabaseServerClient();
-  const signed = await supabase.auth.signInWithPassword({ email: profile.email, password });
+  const { data: identity, error: identityError } = await admin.auth.admin.getUserById(profile.user_id);
+  if (identityError || !identity.user?.email) return fail("INVALID_CREDENTIALS", "아이디 또는 비밀번호가 올바르지 않습니다.", 401);
+  const signed = await supabase.auth.signInWithPassword({ email: identity.user.email, password });
   if (signed.error || !signed.data.user) return fail("INVALID_CREDENTIALS", "아이디 또는 비밀번호가 올바르지 않습니다.", 401);
   await admin.from("profiles").update({ last_login_at: new Date().toISOString() }).eq("user_id", profile.user_id);
   return ok({ user: { userId: profile.user_id, loginId, role: profile.role, approvalStatus: profile.approval_status } });
