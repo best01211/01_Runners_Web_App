@@ -1,3 +1,4 @@
+import { publicSchedule } from "@/lib/public-data";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -8,18 +9,18 @@ type Context = { params: Promise<{ scheduleId: string }> };
 
 export async function GET(_request: Request, { params }: Context) {
   const profile = await getCurrentProfile();
-  if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
   const { scheduleId } = await params;
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin.from("schedules").select("*").eq("schedule_id", scheduleId).is("deleted_at", null).maybeSingle();
   if (error) return fail("DATABASE_ERROR", "일정 조회에 실패했습니다.", 500);
   if (!data) return fail("SCHEDULE_NOT_FOUND", "일정을 찾을 수 없습니다.", 404);
-  return ok({ schedule: data });
+  return ok({ schedule: publicSchedule(data) });
 }
 
-export async function PATCH(request: Request, { params }: Context) {
+export async function PATCH(request: Request, { params }: Context) {if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
   const profile = await getCurrentProfile();
-  if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
   const { scheduleId } = await params;
   const admin = createSupabaseAdminClient();
   const { data: current } = await admin.from("schedules").select("*").eq("schedule_id", scheduleId).maybeSingle();
@@ -36,12 +37,12 @@ export async function PATCH(request: Request, { params }: Context) {
 
   const { data, error } = await admin.from("schedules").update(parsed.value!).eq("schedule_id", scheduleId).select().single();
   if (error) return fail("SCHEDULE_UPDATE_FAILED", "일정 수정에 실패했습니다.", 500);
-  return ok({ schedule: data });
+  return ok({ schedule: publicSchedule(data) });
 }
 
-export async function DELETE(request: Request, { params }: Context) {
+export async function DELETE(request: Request, { params }: Context) {if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
   const profile = await getCurrentProfile();
-  if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
   const { scheduleId } = await params;
   const admin = createSupabaseAdminClient();
   const { data: current } = await admin.from("schedules").select("*").eq("schedule_id", scheduleId).maybeSingle();
@@ -60,5 +61,5 @@ export async function DELETE(request: Request, { params }: Context) {
   }).eq("schedule_id", scheduleId).select().single();
 
   if (error) return fail("SCHEDULE_CANCEL_FAILED", "일정 취소에 실패했습니다.", 500);
-  return ok({ schedule: data });
+  return ok({ schedule: publicSchedule(data) });
 }

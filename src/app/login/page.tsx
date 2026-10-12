@@ -1,5 +1,6 @@
 "use client";
 
+import { safeNextPath } from "@/lib/public-data";
 import Link from "next/link";
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -43,7 +44,7 @@ function LoginForm() {
         return;
       }
 
-      const nextPath = searchParams.get("next") ?? "/dashboard";
+      const nextPath = safeNextPath(searchParams.get("next"));
 
       router.replace(nextPath);
       router.refresh();
@@ -120,6 +121,10 @@ function LoginForm() {
             {isSubmitting ? "로그인 중..." : "로그인"}
           </button>
         </form>
+        {searchParams.get("signup") === "complete" && <p className="mt-4 text-sm text-emerald-700">가입 신청이 완료되었습니다. 이메일 확인이 필요한 경우 메일의 링크를 열어주세요. 운영진 승인 후 로그인할 수 있습니다.</p>}
+        {searchParams.get("confirmed") === "1" && <p className="mt-4 text-sm text-emerald-700">이메일 인증이 완료되었습니다.</p>}
+        {searchParams.get("authError") && <p role="alert" className="mt-4 text-sm text-red-600">인증 링크가 만료되었거나 사용할 수 없습니다.</p>}
+        <Link href="/signup" className="mt-5 block text-center text-sm font-semibold">회원가입 신청</Link>
         <Link href="/auth/forgot-password" className="mt-5 block text-center text-sm font-semibold text-emerald-700">비밀번호를 잊으셨나요?</Link>
       </section>
     </main>

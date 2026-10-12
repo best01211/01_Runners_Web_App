@@ -3,8 +3,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
+  if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN", "허용되지 않은 요청입니다.", 403);
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return fail("INVALID_JSON", "요청 형식이 올바르지 않습니다."); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return fail("INVALID_JSON", "입력값을 확인해주세요.");
   const loginId = String(body.loginId ?? "").trim();
   const password = String(body.password ?? "");
   if (!loginId || !password) return fail("VALIDATION_ERROR", "아이디와 비밀번호를 입력해 주세요.");

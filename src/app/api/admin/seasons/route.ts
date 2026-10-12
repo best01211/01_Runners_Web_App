@@ -1,23 +1,24 @@
 import { fail, ok } from "@/lib/api-response";
-import { getCurrentProfile } from "@/lib/auth/current-user";
+import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 export async function GET() {
   const profile = await getCurrentProfile();
-  if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
-  const { data, error } = await createSupabaseAdminClient().from("seasons").select("*").order("starts_on", { ascending: false });
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("FORBIDDEN", "이용 권한이 필요합니다.", 403);
+  let query = createSupabaseAdminClient().from("seasons").select("*").order("starts_on", { ascending: false });
+  if (!isStaffOrAdmin(profile)) query = query.eq("is_public", true).neq("status", "hidden");
+  const { data, error } = await query;
   return error ? fail("DATABASE_ERROR", "시즌을 불러오지 못했습니다.", 500) : ok({ seasons: data });
 }
-
 export async function POST(request: Request) {
-  const profile = await getCurrentProfile();
-  if (profile?.role !== "admin") return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
-  const body = await request.json();
-  const startsOn = String(body.startsOn ?? "");
-  const endsOn = String(body.endsOn ?? "");
-  if (!body.name || !startsOn || !endsOn || startsOn > endsOn) return fail("INVALID_PERIOD", "시즌 기간을 확인해주세요.");
-  const admin = createSupabaseAdminClient();
-  if (body.isDefault) await admin.from("seasons").update({ is_default: false }).eq("is_default", true);
-  const { data, error } = await admin.from("seasons").insert({ name: String(body.name).trim(), starts_on: startsOn, ends_on: endsOn, status: body.status ?? "scheduled", is_public: body.isPublic !== false, is_default: body.isDefault === true, created_by: profile.user_id }).select().single();
-  return error ? fail("CREATE_FAILED", "시즌 생성에 실패했습니다.", 500) : ok({ season: data }, 201);
+  if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN", "허용되지 않은 요청입니다.", 403);
+  let body;
+  try { body = await request.json(); } catch { return fail("INVALID_JSON", "입력값을 확인해주세요."); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return fail("INVALID_JSON", "입력값을 확인해주세요.");
+  const starts = String(body.startsOn ?? ""), ends = String(body.endsOn ?? "");
+  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  if (!String(body.name ?? "").trim() || !validDate(starts) || !validDate(ends) || starts > ends || !["scheduled", "active", "closed", "hidden"].includes(body.status ?? "scheduled")) return fail("INVALID_PERIOD", "시즌 이름과 기간·상태를 확인해주세요.");
+  const client = await createSupabaseServerClient();
+  const { data, error } = await client.rpc("create_season", { payload: body });
+  return error ? fail("CREATE_FAILED", "시즌 생성에 실패했습니다. 기본 시즌은 공개 상태여야 합니다.", 409) : ok({ season: data }, 201);
 }

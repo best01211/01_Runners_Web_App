@@ -3,7 +3,7 @@ import { getCurrentProfile } from "@/lib/auth/current-user";
 import { loadRanking } from "@/lib/ranking-server";
 export async function GET(request: Request) {
  const p = await getCurrentProfile();
- if (!p) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+ if (!p || p.account_status !== "active" || p.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
  try {
   const data = await loadRanking(new URL(request.url).searchParams.get("seasonId"),p.role === "admin");
   return ok({ ...data, me: data.ranking.find(row => row.userId === p.user_id) ?? null });

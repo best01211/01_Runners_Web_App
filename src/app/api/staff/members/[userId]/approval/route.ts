@@ -1,17 +1,18 @@
+import { readJsonObject } from "@/lib/request-json";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ userId: string }> };
 
-export async function PATCH(request: Request, { params }: Params) {
+export async function PATCH(request: Request, { params }: Params) {if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
   const actor = await getCurrentProfile();
   if (!actor) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
   if (!isStaffOrAdmin(actor)) return fail("FORBIDDEN", "운영 권한이 필요합니다.", 403);
 
   const { userId } = await params;
-  let body: { decision?: unknown; reason?: unknown; allowReapplication?: unknown };
-  try { body = await request.json(); } catch { return fail("INVALID_JSON", "요청 형식이 올바르지 않습니다.", 400); }
+  const body = await readJsonObject(request);
+  if (!body) return fail("INVALID_JSON", "입력값을 확인해주세요.");
 
   const decision = String(body.decision ?? "").trim().toLowerCase();
   const reason = String(body.reason ?? "").trim();

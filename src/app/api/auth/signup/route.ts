@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { validateSignup } from "@/lib/validation/auth";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
+  if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN", "허용되지 않은 요청입니다.", 403);
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return fail("INVALID_JSON", "요청 형식이 올바르지 않습니다."); }
   const parsed = validateSignup(body);

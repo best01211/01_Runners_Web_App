@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 type Context = { params: Promise<{ scheduleId: string }> };
 export async function GET(_: Request, { params }: Context) {
  const p = await getCurrentProfile();
- if (!p) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+ if (!p || p.account_status !== "active" || p.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
  const { scheduleId } = await params, admin = createSupabaseAdminClient();
  const { data: schedule, error: scheduleError } = await admin.from("schedules").select("*").eq("schedule_id", scheduleId).is("deleted_at", null).maybeSingle();
  if (scheduleError) return fail("DATABASE_ERROR", "일정 조회에 실패했습니다.", 500);

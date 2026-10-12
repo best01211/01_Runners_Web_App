@@ -1,3 +1,4 @@
+import { publicSchedule } from "@/lib/public-data";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -5,7 +6,7 @@ import { validateSchedulePayload } from "@/lib/validation/schedule";
 
 export async function GET() {
   const profile = await getCurrentProfile();
-  if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
 
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
@@ -18,9 +19,9 @@ export async function GET() {
   return ok({ schedules: data });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request) {if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
   const profile = await getCurrentProfile();
-  if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
 
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return fail("INVALID_JSON", "요청 형식이 올바르지 않습니다.", 400); }
@@ -42,8 +43,6 @@ export async function POST(request: Request) {
     console.error(error);
     return fail("SCHEDULE_CREATE_FAILED", "일정 생성에 실패했습니다.", 500);
   }
-  if (data.schedule_type === "flash") {
-    await admin.from("schedule_participations").insert({ schedule_id: data.schedule_id, user_id: profile.user_id, status: "registered", registration_source: "creator" });
-  }
-  return ok({ schedule: data }, 201);
+  // Creator participation is inserted atomically by migration 009.
+  return ok({ schedule: publicSchedule(data) }, 201);
 }

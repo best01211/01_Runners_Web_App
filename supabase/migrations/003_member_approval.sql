@@ -55,11 +55,11 @@ begin
     and account_status = 'active'
     and approval_status = 'approved';
 
-  if actor_role not in ('staff', 'admin') then
+  if actor_role is null or actor_role not in ('staff', 'admin') then
     raise exception using errcode = '42501', message = 'FORBIDDEN';
   end if;
 
-  if normalized_decision not in ('approve', 'reject') then
+  if normalized_decision is null or normalized_decision not in ('approve', 'reject') then
     raise exception using errcode = '22023', message = 'INVALID_DECISION';
   end if;
 
@@ -72,8 +72,8 @@ begin
     raise exception using errcode = 'P0002', message = 'MEMBER_NOT_FOUND';
   end if;
 
-  if target_profile.approval_status <> 'pending'
-     or target_profile.role <> 'pending' then
+  if target_profile.approval_status is distinct from 'pending'
+     or target_profile.role is distinct from 'pending' then
     raise exception using errcode = 'P0001', message = 'MEMBER_NOT_PENDING';
   end if;
 

@@ -8,7 +8,7 @@ export async function GET() {
  const { data, error } = await createSupabaseAdminClient().from("system_settings").select("*");
  return error ? fail("DATABASE_ERROR", "설정을 불러오지 못했습니다.", 500) : ok({ settings: data });
 }
-export async function PUT(request: Request) {
+export async function PUT(request: Request) {if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
  const p = await getCurrentProfile();
  if (p?.role !== "admin" || !isStaffOrAdmin(p)) return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
  let body;

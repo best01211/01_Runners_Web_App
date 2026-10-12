@@ -37,8 +37,8 @@ export function publicName(profile: Pick<CurrentProfile, "nickname" | "login_id"
 }
 
 export function canManageStaff(profile: CurrentProfile | null) {
-  return profile?.role === "admin" ||
-    (profile?.role === "staff" && ["president", "vice_president"].includes(profile.staff_position ?? ""));
+  return isStaffOrAdmin(profile) && (profile?.role === "admin" ||
+    (profile?.role === "staff" && ["president", "vice_president"].includes(profile.staff_position ?? "")));
 }
 
 export function isStaffOrAdmin(profile: CurrentProfile | null) {

@@ -1,12 +1,15 @@
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
 
 type Context = { params: Promise<{ scheduleId: string }> };
 
 function mapError(message: string) {
   const m: Record<string,[string,string,number]> = {
+    INVALID_PACE_GROUP:["INVALID_PACE_GROUP","해당 일정의 페이스 그룹을 선택해주세요.",400],
+    PACE_GROUP_REQUIRED:["PACE_GROUP_REQUIRED","정기런은 페이스 그룹 선택이 필요합니다.",400],
+    PACE_CHANGE_LOCKED:["PACE_CHANGE_LOCKED","출석 시작 후에는 그룹을 변경할 수 없습니다.",409],
     UNAUTHENTICATED:["UNAUTHORIZED","로그인이 필요합니다.",401],
     PARTICIPATION_FORBIDDEN:["FORBIDDEN","이 계정은 참가할 수 없습니다.",403],
     SCHEDULE_NOT_FOUND:["SCHEDULE_NOT_FOUND","일정을 찾을 수 없습니다.",404],
@@ -25,7 +28,7 @@ function mapError(message: string) {
 
 export async function GET(_request: Request,{params}:Context){
   const profile=await getCurrentProfile();
-  if(!profile) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
   const {scheduleId}=await params;
   const supabase=await createSupabaseServerClient();
   const {data,error}=await supabase.from("schedule_participations")
@@ -36,21 +39,21 @@ export async function GET(_request: Request,{params}:Context){
   return ok({participation:data});
 }
 
-export async function POST(request: Request,{params}:Context){
+export async function POST(request: Request,{params}:Context){if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
   const profile=await getCurrentProfile();
-  if(!profile) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
   const {scheduleId}=await params;
   const supabase=await createSupabaseServerClient();
-  let paceGroupId:string|null=null;try{const body=await request.json();paceGroupId=String(body.paceGroupId??"")||null;}catch{}
-  const {data,error}=await supabase.rpc("register_schedule_participation",{target_schedule_id:scheduleId});
+  let paceGroupId:string|null=null;try{const body=await request.json();paceGroupId=String(body.paceGroupId??"")||null;}catch{return fail("INVALID_JSON","입력값을 확인해주세요.");}
+  const {data,error}=await supabase.rpc("register_schedule_participation_with_group",{target_schedule_id:scheduleId,target_pace_group_id:paceGroupId});
   if(error){ const [c,m,s]=mapError(error.message); return fail(c,m,s); }
-  if(paceGroupId)await supabase.from("schedule_participations").update({pace_group_id:paceGroupId}).eq("participation_id",data.participation_id);
-  return ok({participation:{...data,pace_group_id:paceGroupId}},201);
+
+  return ok({participation:data},201);
 }
 
-export async function DELETE(request: Request,{params}:Context){
+export async function DELETE(request: Request,{params}:Context){if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
   const profile=await getCurrentProfile();
-  if(!profile) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
   const {scheduleId}=await params;
   let reason="";
   try{ const body=await request.json(); reason=String(body.reason??"").trim(); }catch{}
@@ -60,21 +63,14 @@ export async function DELETE(request: Request,{params}:Context){
   return ok({participation:data});
 }
 
-export async function PATCH(request: Request,{params}:Context){
+export async function PATCH(request: Request,{params}:Context){if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
   const profile=await getCurrentProfile();
-  if(!profile) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
   const {scheduleId}=await params;
   let paceGroupId="";
   try{paceGroupId=String((await request.json()).paceGroupId??"");}catch{return fail("INVALID_JSON","요청 형식이 올바르지 않습니다.");}
   const supabase=await createSupabaseServerClient();
-  const [{data:group},{data:participation},{data:schedule}]=await Promise.all([
-    supabase.from("pace_groups").select("pace_group_id").eq("pace_group_id",paceGroupId).eq("schedule_id",scheduleId).maybeSingle(),
-    supabase.from("schedule_participations").select("participation_id,pace_change_locked").eq("schedule_id",scheduleId).eq("user_id",profile.user_id).eq("status","registered").maybeSingle(),
-    supabase.from("schedules").select("attendance_opened_at").eq("schedule_id",scheduleId).maybeSingle(),
-  ]);
-  if(!group) return fail("INVALID_PACE_GROUP","페이스 그룹을 찾을 수 없습니다.",404);
-  if(!participation) return fail("NOT_PARTICIPATING","참가 신청을 먼저 해주세요.",409);
-  if(participation.pace_change_locked||schedule?.attendance_opened_at) return fail("PACE_CHANGE_LOCKED","출석 시작 후에는 그룹을 변경할 수 없습니다.",409);
-  const {data,error}=await createSupabaseAdminClient().from("schedule_participations").update({pace_group_id:paceGroupId}).eq("participation_id",participation.participation_id).select().single();
-  return error?fail("PACE_CHANGE_FAILED","그룹 변경에 실패했습니다.",500):ok({participation:data});
+  const {data,error}=await supabase.rpc("change_participation_group",{target_schedule_id:scheduleId,target_pace_group_id:paceGroupId});
+  if(error){const [c,m,status]=mapError(error.message);return fail(c,m,status);}
+  return ok({participation:data});
 }

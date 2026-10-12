@@ -3,7 +3,7 @@ import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 export async function PATCH(request: Request) {
   const profile = await getCurrentProfile();
-  if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
   if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN", "허용되지 않은 요청입니다.", 403);
   let body;
   try { body = await request.json(); } catch { return fail("INVALID_JSON", "입력값을 확인해주세요."); }

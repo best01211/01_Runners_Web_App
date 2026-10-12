@@ -1,4 +1,5 @@
 export function validateSignup(body: Record<string, unknown>) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { error: "입력값을 확인해주세요." };
   const value = {
     loginId: String(body.loginId ?? "").trim(), email: String(body.email ?? "").trim().toLowerCase(),
     password: String(body.password ?? ""), passwordConfirm: String(body.passwordConfirm ?? ""),
