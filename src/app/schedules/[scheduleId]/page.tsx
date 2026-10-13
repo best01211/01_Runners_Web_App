@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { scheduleTypeLabels, scheduleStatusLabels } from "@/lib/schedule-labels";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
@@ -18,6 +20,12 @@ export default async function ScheduleDetailPage({params}:Props){
   if(error) throw new Error("일정을 불러오지 못했습니다.");
   if(!schedule) notFound();
 
+  let imageUrl: string | null = null;
+  if (schedule.schedule_type === "regular" && schedule.regular_template_id) {
+    const { data: template, error: templateError } = await admin.from("regular_run_templates").select("image_url").eq("template_id", schedule.regular_template_id).maybeSingle();
+    if (templateError) throw new Error("정기런 사진을 불러오지 못했습니다.");
+    imageUrl = template?.image_url ?? null;
+  }
   const canManage=isStaffOrAdmin(profile)||(schedule.schedule_type==="flash"&&schedule.creator_id===profile.user_id);
   const [{data:participation},{count:participantCount},{data:paceGroups}]=await Promise.all([
     admin.from("schedule_participations").select("participation_id,status,participation_locked,pace_change_locked,pace_group_id").eq("schedule_id",scheduleId).eq("user_id",profile.user_id).in("status",["registered","completed"]).maybeSingle(),
@@ -28,10 +36,11 @@ export default async function ScheduleDetailPage({params}:Props){
 
   return <main className="mx-auto min-h-screen max-w-4xl px-6 py-12">
     <Link href="/schedules" className="text-sm font-semibold text-emerald-700">← 일정 목록</Link>
-    <section className="mt-6 rounded-3xl border border-zinc-200 p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-semibold text-emerald-600">{schedule.schedule_type} · {schedule.status}</p><h1 className="mt-2 text-3xl font-bold">{schedule.title}</h1></div>
+    <section className="mt-6 rounded-3xl border border-zinc-200 p-4 sm:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-semibold text-emerald-600">{scheduleTypeLabels[schedule.schedule_type]??schedule.schedule_type} · {scheduleStatusLabels[schedule.status]??schedule.status}</p><h1 className="mt-2 text-3xl font-bold">{schedule.title}</h1></div>
       {canManage&&schedule.status!=="cancelled"&&<div className="flex gap-2"><Link href={`/schedules/${scheduleId}/edit`} className="rounded-xl border border-zinc-300 px-4 py-2 font-semibold">수정</Link><CancelScheduleButton scheduleId={scheduleId}/></div>}</div>
       <dl className="mt-8 grid gap-5 rounded-2xl bg-zinc-50 p-6 sm:grid-cols-2"><div><dt className="text-sm text-zinc-500">일정 시간</dt><dd className="mt-1 font-semibold">{new Date(schedule.start_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</dd></div><div><dt className="text-sm text-zinc-500">장소</dt><dd className="mt-1 font-semibold">{schedule.location}</dd></div><div><dt className="text-sm text-zinc-500">신청 마감</dt><dd className="mt-1 font-semibold">{new Date(schedule.registration_end_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</dd></div><div><dt className="text-sm text-zinc-500">정원</dt><dd className="mt-1 font-semibold">{schedule.capacity?`${schedule.capacity}명`:"제한 없음"}</dd></div></dl>
+      {imageUrl && <Image unoptimized src={imageUrl} alt="정기런 안내 사진" width={1200} height={675} className="mt-8 max-h-[32rem] w-full rounded-2xl object-contain" />}
       <div className="mt-8 whitespace-pre-wrap leading-7 text-zinc-700">{schedule.description||"상세 설명이 없습니다."}</div>
       {schedule.status==="cancelled"?<div className="mt-8 rounded-2xl bg-red-50 p-5 text-red-800">취소된 일정입니다.{schedule.cancellation_reason?` 사유: ${schedule.cancellation_reason}`:""}</div>:<ParticipationPanel scheduleId={scheduleId} scheduleType={schedule.schedule_type} scheduleStatus={schedule.status} participantCount={participantCount??0} capacity={schedule.capacity} capacityExempt={profile.role==="staff"&&!schedule.staff_in_capacity} registrationStartAt={schedule.registration_start_at} registrationEndAt={schedule.registration_end_at} cancellationDeadlineAt={schedule.cancellation_deadline_at} participation={participation} canParticipate={canParticipate} paceGroups={paceGroups??[]} canCreatePaceGroup={isStaffOrAdmin(profile)||(schedule.schedule_type==="flash"&&(canManage||Boolean(participation)))}/>}
       

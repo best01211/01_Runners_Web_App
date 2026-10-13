@@ -35,6 +35,12 @@ export async function PATCH(request: Request, { params }: Context) {if (request.
   if ("error" in parsed) return fail("VALIDATION_ERROR", parsed.error!, 400);
   if (!canEditScheduleType(profile.role, parsed.value!.schedule_type)) return fail("FORBIDDEN", "일반 회원은 번개런만 수정할 수 있습니다.", 403);
 
+  if (parsed.value!.schedule_type === "regular" && !parsed.value!.regular_template_id && (current.schedule_type !== "regular" || current.regular_template_id)) return fail("TEMPLATE_REQUIRED", "정기런 양식을 선택해주세요.", 400);
+  if (parsed.value!.regular_template_id && parsed.value!.regular_template_id !== current.regular_template_id) {
+    const { data: template, error: templateError } = await admin.from("regular_run_templates").select("template_id").eq("template_id", parsed.value!.regular_template_id).is("deleted_at", null).maybeSingle();
+    if (templateError) return fail("DATABASE_ERROR", "정기런 양식을 확인하지 못했습니다.", 500);
+    if (!template) return fail("INVALID_TEMPLATE", "삭제되었거나 존재하지 않는 양식입니다.", 409);
+  }
   const { data, error } = await admin.from("schedules").update(parsed.value!).eq("schedule_id", scheduleId).select().single();
   if (error) return fail("SCHEDULE_UPDATE_FAILED", "일정 수정에 실패했습니다.", 500);
   return ok({ schedule: publicSchedule(data) });

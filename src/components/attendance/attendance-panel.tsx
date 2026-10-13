@@ -20,7 +20,11 @@ export function AttendancePanel({ scheduleId, canManage }: { scheduleId: string;
     try {
       const response=await fetch('/api/schedules/'+scheduleId+'/attendance',{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       const result=await response.json();
-      if(!response.ok) throw new Error(result.error?.message ?? "처리에 실패했습니다.");
+      if(!response.ok) {
+        const detail = result.error?.details;
+        const diagnostic = detail?.databaseCode ? ` [${detail.databaseCode}] ${detail.databaseMessage ?? ""}` : "";
+        throw new Error((result.error?.message ?? "처리에 실패했습니다.") + diagnostic);
+      }
       setMessage("처리되었습니다.");await load();
     } catch(error) { setMessage(error instanceof Error ? error.message : "서버와 통신하지 못했습니다."); }
     finally {setBusy(false)}

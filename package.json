@@ -11,7 +11,12 @@
     "test:auth": "node scripts/test-auth.mjs",
     "test:release": "node scripts/test-release.mjs",
     "test:release-db": "node scripts/test-release-database.mjs",
-    "test:stabilization-db": "node scripts/test-stabilization-database.mjs"
+    "test:stabilization-db": "node scripts/test-stabilization-database.mjs",
+    "test:regular-templates-db": "node scripts/test-regular-templates-database.mjs",
+    "test:member-deletion-db": "node scripts/test-member-deletion-database.mjs",
+    "test:operational-enums-db": "node scripts/test-operational-enums-database.mjs",
+    "test:pace-group-unification-db": "node scripts/test-pace-group-unification-database.mjs",
+    "test:template-groups-db": "node scripts/test-template-groups-database.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

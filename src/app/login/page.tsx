@@ -20,6 +20,7 @@ function LoginForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmitting) return;
 
     setErrorMessage("");
     setIsSubmitting(true);
@@ -66,6 +67,7 @@ function LoginForm() {
           이메일이 아닌 회원 아이디와 비밀번호를 입력해 주세요.
         </p>
 
+        {searchParams.get("passwordChanged") === "1" && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.</p>}
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           <div>
             <label

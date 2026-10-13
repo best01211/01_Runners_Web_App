@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 
@@ -12,7 +13,7 @@ export default async function DashboardPage() {
         <form action="/api/auth/logout" method="post"><button className="rounded-xl border px-4 py-2 text-sm font-semibold">로그아웃</button></form>
       </header>
       <section className="mt-10 grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border p-6"><h2 className="text-lg font-bold">회원 정보</h2><p className="mt-3 text-zinc-600">역할: {profile.role} · 승인: {profile.approval_status}</p></article>
+        <article className="rounded-2xl border p-6"><div className="flex items-center gap-4">{profile.profile_image_url && <Image unoptimized src={profile.profile_image_url} alt="내 프로필 사진" width={64} height={64} className="h-16 w-16 rounded-full object-cover" />}<div><h2 className="text-lg font-bold">회원 정보</h2><p className="mt-2 text-zinc-600">{{admin:"관리자",staff:"운영진",member:"회원",guest:"게스트",pending:"승인 대기"}[profile.role]} · {profile.approval_status === "approved" ? "승인 완료" : "승인 대기"}</p></div></div></article>
         <Link href="/schedules" className="rounded-2xl border p-6"><h2 className="text-lg font-bold">일정</h2><p className="mt-3 text-zinc-600">러닝과 이벤트를 확인합니다.</p></Link>
         <Link href="/tracking" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6"><h2 className="text-lg font-bold">대회 선수 추적</h2><p className="mt-3 text-zinc-600">대회 코스·배번호와 계측 기록으로 예상 위치를 확인합니다.</p></Link>
         <Link href="/leaderboard" className="rounded-2xl border p-6"><h2 className="text-lg font-bold">랭킹</h2><p className="mt-3 text-zinc-600">시즌 활동 순위를 확인합니다.</p></Link>

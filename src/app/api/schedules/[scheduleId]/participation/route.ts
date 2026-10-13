@@ -1,13 +1,14 @@
 import { fail, ok } from "@/lib/api-response";
-import { getCurrentProfile } from "@/lib/auth/current-user";
+import { getCurrentProfile, isStaffOrAdmin, type CurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 
 type Context = { params: Promise<{ scheduleId: string }> };
 
-function mapError(message: string) {
+function mapError(message: string): [string,string,number] {
   const m: Record<string,[string,string,number]> = {
     INVALID_PACE_GROUP:["INVALID_PACE_GROUP","해당 일정의 페이스 그룹을 선택해주세요.",400],
+    PACE_GROUP_SCHEDULE_MISMATCH:["PACE_GROUP_SCHEDULE_MISMATCH","DB의 페이스 그룹 연결 검증에서 참가가 거절됐습니다. 운영진에게 확인을 요청해주세요.",409],
     PACE_GROUP_REQUIRED:["PACE_GROUP_REQUIRED","정기런은 페이스 그룹 선택이 필요합니다.",400],
     PACE_CHANGE_LOCKED:["PACE_CHANGE_LOCKED","출석 시작 후에는 그룹을 변경할 수 없습니다.",409],
     UNAUTHENTICATED:["UNAUTHORIZED","로그인이 필요합니다.",401],
@@ -23,7 +24,14 @@ function mapError(message: string) {
     PARTICIPATION_LOCKED:["PARTICIPATION_LOCKED","출석이 시작되어 참가를 취소할 수 없습니다.",409],
     CANCELLATION_DEADLINE_PASSED:["CANCELLATION_DEADLINE_PASSED","참가 취소 가능 시간이 지났습니다.",409],
   };
-  return m[message] ?? ["PARTICIPATION_FAILED","참가 처리에 실패했습니다.",500];
+  const key = Object.keys(m).find(key => message === key || message.startsWith(`${key}:`));
+  return key ? m[key] : ["PARTICIPATION_FAILED","참가 처리에 실패했습니다.",500];
+}
+
+function participationFailure(error: {code:string;message:string;details?:string;hint?:string}, profile: CurrentProfile, scheduleId: string, action: string) {
+  console.error("Participation RPC failed", {scheduleId, action, code:error.code, message:error.message, details:error.details, hint:error.hint});
+  const [code,message,status] = mapError(error.message);
+  return fail(code,message,status,code === "PARTICIPATION_FAILED" ? {databaseCode:error.code,...(isStaffOrAdmin(profile)?{databaseMessage:error.message}:{})} : undefined);
 }
 
 export async function GET(_request: Request,{params}:Context){
@@ -46,7 +54,7 @@ export async function POST(request: Request,{params}:Context){if (request.header
   const supabase=await createSupabaseServerClient();
   let paceGroupId:string|null=null;try{const body=await request.json();paceGroupId=String(body.paceGroupId??"")||null;}catch{return fail("INVALID_JSON","입력값을 확인해주세요.");}
   const {data,error}=await supabase.rpc("register_schedule_participation_with_group",{target_schedule_id:scheduleId,target_pace_group_id:paceGroupId});
-  if(error){ const [c,m,s]=mapError(error.message); return fail(c,m,s); }
+  if(error) return participationFailure(error,profile,scheduleId,"register");
 
   return ok({participation:data},201);
 }
@@ -59,7 +67,7 @@ export async function DELETE(request: Request,{params}:Context){if (request.head
   try{ const body=await request.json(); reason=String(body.reason??"").trim(); }catch{}
   const supabase=await createSupabaseServerClient();
   const {data,error}=await supabase.rpc("cancel_schedule_participation",{target_schedule_id:scheduleId,reason_text:reason||null});
-  if(error){ const [c,m,s]=mapError(error.message); return fail(c,m,s); }
+  if(error) return participationFailure(error,profile,scheduleId,"cancel");
   return ok({participation:data});
 }
 
@@ -71,6 +79,6 @@ export async function PATCH(request: Request,{params}:Context){if (request.heade
   try{paceGroupId=String((await request.json()).paceGroupId??"");}catch{return fail("INVALID_JSON","요청 형식이 올바르지 않습니다.");}
   const supabase=await createSupabaseServerClient();
   const {data,error}=await supabase.rpc("change_participation_group",{target_schedule_id:scheduleId,target_pace_group_id:paceGroupId});
-  if(error){const [c,m,status]=mapError(error.message);return fail(c,m,status);}
+  if(error) return participationFailure(error,profile,scheduleId,"change-group");
   return ok({participation:data});
 }

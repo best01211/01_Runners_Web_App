@@ -1,3 +1,4 @@
+import { parsePaceGroups } from "@/lib/regular-run-templates";
 import { publicSchedule } from "@/lib/public-data";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
@@ -29,19 +30,29 @@ export async function POST(request: Request) {if (request.headers.get("origin") 
   const parsed = validateSchedulePayload(body);
   if ("error" in parsed) return fail("VALIDATION_ERROR", parsed.error!, 400);
 
+  const groupPayload = body.paceGroups === undefined ? null : parsePaceGroups(body.paceGroups);
+  if (body.paceGroups !== undefined && !groupPayload) return fail("INVALID_PACE_GROUPS", "페이스 그룹은 중복 없이 30초·5km 단위로 입력해주세요.", 400);
+  if (parsed.value!.schedule_type === "regular" && groupPayload && !groupPayload.length) return fail("PACE_GROUP_REQUIRED", "정기런에는 페이스 그룹을 한 개 이상 추가해주세요.", 400);
   const canCreate = isStaffOrAdmin(profile) || (profile.role === "member" && parsed.value!.schedule_type === "flash");
   if (!canCreate) return fail("FORBIDDEN", "일반 회원은 번개런만 생성할 수 있습니다.", 403);
 
   const admin = createSupabaseAdminClient();
+  if (parsed.value!.schedule_type === "regular") {
+    const id = parsed.value!.regular_template_id;
+    if (!id) return fail("TEMPLATE_REQUIRED", "정기런 양식을 선택해주세요.", 400);
+    const { data: template, error: templateError } = await admin.from("regular_run_templates").select("template_id").eq("template_id", id).is("deleted_at", null).maybeSingle();
+    if (templateError) return fail("DATABASE_ERROR", "정기런 양식을 확인하지 못했습니다. 010 SQL 적용 상태를 확인해주세요.", 500);
+    if (!template) return fail("INVALID_TEMPLATE", "삭제되었거나 존재하지 않는 양식입니다.", 409);
+  }
   const { data, error } = await admin
     .from("schedules")
-    .insert({ ...parsed.value!, status: "open", creator_id: profile.user_id })
+    .insert({ ...parsed.value!, ...(groupPayload ? {creation_pace_groups:groupPayload} : {}), status: "open", creator_id: profile.user_id })
     .select()
     .single();
 
   if (error) {
     console.error(error);
-    return fail("SCHEDULE_CREATE_FAILED", "일정 생성에 실패했습니다.", 500);
+    return fail("SCHEDULE_CREATE_FAILED", "일정 생성에 실패했습니다. 페이스 그룹을 입력했다면 015 SQL 적용 상태를 확인해주세요.", 500);
   }
   // Creator participation is inserted atomically by migration 009.
   return ok({ schedule: publicSchedule(data) }, 201);

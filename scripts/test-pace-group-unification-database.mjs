@@ -1,0 +1,31 @@
+import { PGlite } from '../.test-output/sql-qa/node_modules/@electric-sql/pglite/dist/index.js';
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const db=new PGlite();
+await db.exec(`
+create schema public_qa;
+create table schedules(schedule_id uuid primary key);
+create table pace_groups(pace_group_id uuid primary key,schedule_id uuid references schedules,pace_seconds integer,distance_km integer,unique(schedule_id,pace_seconds,distance_km));
+create table schedule_pace_groups(pace_group_id uuid primary key,schedule_id uuid references schedules,pace_seconds integer,distance_km integer);
+create table schedule_participations(participation_id uuid primary key default gen_random_uuid(),schedule_id uuid references schedules,user_id uuid,pace_group_id uuid references schedule_pace_groups on delete restrict);
+create function validate_participation_pace_group() returns trigger language plpgsql as $$begin
+if new.pace_group_id is not null and not exists(select 1 from schedule_pace_groups g where g.pace_group_id=new.pace_group_id and g.schedule_id=new.schedule_id) then raise exception 'PACE_GROUP_SCHEDULE_MISMATCH';end if;return new;end$$;
+create trigger trg_validate_participation_pace_group before insert or update of schedule_id,pace_group_id on schedule_participations for each row execute function validate_participation_pace_group();
+`);
+const run='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',current='33333333-3333-4333-8333-333333333333',old='44444444-4444-4444-8444-444444444444',imported='55555555-5555-4555-8555-555555555555';
+await db.query('insert into schedules values($1),($2)',[run,other]);
+await db.query('insert into pace_groups values($1,$2,360,5)',[current,run]);
+await db.query('insert into schedule_pace_groups values($1,$2,360,5),($3,$2,420,10)',[old,run,imported]);
+await db.query('insert into schedule_participations(schedule_id,pace_group_id) values($1,$2),($1,$3)',[run,old,imported]);
+await assert.rejects(()=>db.query('insert into schedule_participations(schedule_id,pace_group_id) values($1,$2)',[run,current]),/PACE_GROUP_SCHEDULE_MISMATCH/);
+const migration=readFileSync(new URL('../supabase/migrations/013_unify_participation_pace_groups.sql',import.meta.url),'utf8');
+await db.exec(migration);await db.exec(migration);
+assert.equal((await db.query('select count(*)::int n from schedule_participations')).rows[0].n,2);
+assert.deepEqual((await db.query('select pace_group_id from schedule_participations order by pace_group_id')).rows.map(r=>r.pace_group_id),[current,imported]);
+assert.equal((await db.query('select count(*)::int n from schedule_pace_groups')).rows[0].n,2);
+for(let i=0;i<2;i++) await db.query('insert into schedule_participations(schedule_id,pace_group_id) values($1,$2)',[run,current]);
+await assert.rejects(()=>db.query('insert into schedule_participations(schedule_id,pace_group_id) values($1,$2)',[other,current]),/PACE_GROUP_SCHEDULE_MISMATCH/);
+await assert.rejects(()=>db.query('delete from pace_groups where pace_group_id=$1',[current]),/foreign key/);
+assert.equal((await db.query("select confrelid::regclass::text name from pg_constraint where conname='schedule_participations_pace_group_id_fkey'")).rows[0].name,'pace_groups');
+console.log('Pace groups: legacy failure reproduced; migration, ID mapping/import, repeated apply, member/staff inserts, mismatch rejection and FK protection passed');
+await db.close();
