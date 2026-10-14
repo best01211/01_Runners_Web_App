@@ -1,3 +1,4 @@
+import { canUseService } from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -6,7 +7,7 @@ import { parseRegularTemplate } from "@/lib/regular-run-templates";
 import { loadRegularTemplates } from "@/lib/regular-run-templates-server";
 export async function GET() {
   const profile = await getCurrentProfile();
-  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || !canUseService(profile)) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
   try { return ok({ templates: await loadRegularTemplates() }); }
   catch { return fail("DATABASE_ERROR", "정기런 양식을 불러오지 못했습니다. 010 SQL 적용 상태를 확인해주세요.", 500); }
 }

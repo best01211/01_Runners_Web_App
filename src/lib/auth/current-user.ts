@@ -1,5 +1,8 @@
+import {parseMaintenanceSetting,type ServiceFeature} from "@/lib/service-policy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { canStartActivity } from "./account-access";
+export { canUseService, canStartActivity } from "./account-access";
 
 export type CurrentProfile = {
   user_id: string;
@@ -11,6 +14,9 @@ export type CurrentProfile = {
   approval_status: "pending" | "approved" | "rejected" | "cancelled";
   staff_position: "staff" | "vice_president" | "president" | null;
   profile_image_url: string | null;
+  withdrawal_pending?: boolean;
+  is_pacer?: boolean;
+  service_blocked?: Partial<Record<ServiceFeature,boolean>>;
 };
 
 export async function getCurrentProfile(): Promise<CurrentProfile | null> {
@@ -21,7 +27,7 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
     .from("profiles")
-    .select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url")
+    .select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url,is_pacer")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -29,7 +35,13 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
     console.error("getCurrentProfile failed:", error);
     return null;
   }
-  return data as CurrentProfile | null;
+  if (!data) return null;
+  const { data: withdrawal, error: withdrawalError } = await admin.from("withdrawal_requests").select("request_id").eq("user_id", user.id).eq("status", "pending").maybeSingle();
+  if (withdrawalError) return null;
+  const {data:service,error:serviceError}=await admin.from("system_settings").select("setting_value").eq("setting_key","maintenance").maybeSingle();
+  const config=parseMaintenanceSetting(service?.setting_value??{status:"normal"});
+  if(serviceError||!config)return null;
+  return { ...data, service_blocked:config.status==="restricted"?config.blocked:{}, withdrawal_pending: Boolean(withdrawal) } as CurrentProfile;
 }
 
 export function publicName(profile: Pick<CurrentProfile, "nickname" | "login_id">) {
@@ -42,7 +54,7 @@ export function canManageStaff(profile: CurrentProfile | null) {
 }
 
 export function isStaffOrAdmin(profile: CurrentProfile | null) {
-  return profile?.account_status === "active" &&
-    profile.approval_status === "approved" &&
-    (profile.role === "staff" || profile.role === "admin");
+  return canStartActivity(profile) &&
+    Boolean(profile) &&
+    (profile!.role === "staff" || profile!.role === "admin");
 }

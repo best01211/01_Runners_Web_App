@@ -1,3 +1,4 @@
+import { canUseService } from "@/lib/auth/account-access";
 import { publicSchedule } from "@/lib/public-data";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
@@ -9,7 +10,7 @@ type Context = { params: Promise<{ scheduleId: string }> };
 
 export async function GET(_request: Request, { params }: Context) {
   const profile = await getCurrentProfile();
-  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || !canUseService(profile)) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
   const { scheduleId } = await params;
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin.from("schedules").select("*").eq("schedule_id", scheduleId).is("deleted_at", null).maybeSingle();

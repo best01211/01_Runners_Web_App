@@ -1,3 +1,4 @@
+import { canUseService } from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -7,13 +8,14 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN", "허용되지 않은 요청입니다.", 403);
   const profile = await getCurrentProfile();
-  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || !canUseService(profile)) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
   if (Number(request.headers.get("content-length")) > 600 * 1024) return fail("INVALID_IMAGE", "사진 용량이 너무 큽니다.", 413);
   let form: FormData;
   try { form = await request.formData(); } catch { return fail("INVALID_FORM", "사진을 다시 선택해주세요.", 400); }
   const purpose = form.get("purpose");
   if (purpose !== "profile" && purpose !== "regular") return fail("INVALID_PURPOSE", "업로드 용도를 확인해주세요.", 400);
   if (purpose === "regular" && !isStaffOrAdmin(profile)) return fail("FORBIDDEN", "정기런 양식 사진은 관리자와 운영진만 등록할 수 있습니다.", 403);
+  if(purpose === "profile" && profile.service_blocked?.profile)return fail("SERVICE_FEATURE_BLOCKED","관리자 설정으로 내 정보 수정이 제한되어 있습니다.",403);
   const admin = createSupabaseAdminClient();
   const templateId = String(form.get("templateId") ?? "");
   if (purpose === "regular") {

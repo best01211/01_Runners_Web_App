@@ -1,3 +1,4 @@
+import {canUseService} from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -11,13 +12,13 @@ type Context = { params: Promise<{ raceId: string }> };
 async function context(raceId: string) {
  const profile = await getCurrentProfile();
  if (!profile) return { error: fail("UNAUTHORIZED", "로그인이 필요합니다.", 401) };
- if (profile.account_status !== "active" || profile.approval_status !== "approved" || profile.role === "pending") return { error: fail("FORBIDDEN", "승인된 활성 회원만 이용할 수 있습니다.", 403) };
+ if (!canUseService(profile)) return { error: fail("FORBIDDEN", "승인된 활성 회원만 이용할 수 있습니다.", 403) };
  if (!isUUID(raceId)) return { error: fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404) };
  const admin = createSupabaseAdminClient();
  const { data: schedule, error } = await admin.from("tracking_races").select("name,status").eq("race_id", raceId).maybeSingle();
  if (error) return { error: fail("DATABASE_ERROR", "이벤트를 불러오지 못했습니다.", 503) };
  if (!schedule || schedule.status !== "active") return { error: fail("NOT_FOUND", "진행 가능한 이벤트를 찾을 수 없습니다.", 404) };
- return { profile, admin, schedule, canManage: profile.role === "admin" };
+ return { profile, admin, schedule, canManage: profile.role === "admin" && profile.account_status === "active" };
 }
 function databaseFailure(code: string) {
  if (["42P01","PGRST205","PGRST202"].includes(code)) return fail("SETUP_REQUIRED", "추적 전용 DB 설정이 필요합니다. 관리자에게 알려주세요.", 503);

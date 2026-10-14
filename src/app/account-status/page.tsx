@@ -9,7 +9,7 @@ export default async function AccountStatusPage() {
       <section className="w-full rounded-3xl border border-red-200 bg-white p-8 shadow-sm">
         <p className="text-sm font-semibold text-red-600">계정 이용 제한</p>
         <h1 className="mt-3 text-3xl font-bold">현재 서비스를 이용할 수 없습니다</h1>
-        <p className="mt-4 text-zinc-600">현재 계정 상태는 <strong>{profile.account_status}</strong>입니다.</p>
+        <p className="mt-4 text-zinc-600">현재 계정 상태는 <strong>{profile.withdrawal_pending?"탈퇴 처리 대기":({suspended:"정지",restricted:"신규 활동 제한",withdrawn:"탈퇴 완료",active:"활성"}[profile.account_status])}</strong>입니다.</p>
         <form action="/api/auth/logout" method="post" className="mt-8">
           <button type="submit" className="w-full rounded-xl bg-zinc-950 px-4 py-3 font-semibold text-white">로그아웃</button>
         </form>

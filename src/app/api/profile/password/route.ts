@@ -1,10 +1,11 @@
+import { canUseService } from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 export async function PATCH(request: Request) {if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
  const profile = await getCurrentProfile();
- if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+ if (!profile || !canUseService(profile)) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
  let body;
  try { body = await request.json(); } catch { return fail("INVALID_JSON", "입력값을 확인해주세요."); }
  const currentPassword = String(body?.currentPassword ?? ""), password = String(body?.newPassword ?? "");

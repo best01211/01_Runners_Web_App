@@ -2,7 +2,7 @@ import Image from "next/image";
 import { scheduleTypeLabels, scheduleStatusLabels } from "@/lib/schedule-labels";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
+import { getCurrentProfile, isStaffOrAdmin, canStartActivity } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { CancelScheduleButton } from "@/components/schedules/cancel-schedule-button";
 import { ParticipationPanel } from "@/components/participation/participation-panel";
@@ -26,13 +26,13 @@ export default async function ScheduleDetailPage({params}:Props){
     if (templateError) throw new Error("정기런 사진을 불러오지 못했습니다.");
     imageUrl = template?.image_url ?? null;
   }
-  const canManage=isStaffOrAdmin(profile)||(schedule.schedule_type==="flash"&&schedule.creator_id===profile.user_id);
+  const canManage=isStaffOrAdmin(profile)||(canStartActivity(profile)&&schedule.schedule_type==="flash"&&schedule.creator_id===profile.user_id);
   const [{data:participation},{count:participantCount},{data:paceGroups}]=await Promise.all([
     admin.from("schedule_participations").select("participation_id,status,participation_locked,pace_change_locked,pace_group_id").eq("schedule_id",scheduleId).eq("user_id",profile.user_id).in("status",["registered","completed"]).maybeSingle(),
-    schedule.staff_in_capacity ? admin.from("schedule_participations").select("*",{count:"exact",head:true}).eq("schedule_id",scheduleId).in("status",["registered","completed"]) : admin.from("schedule_participations").select("profiles!inner(role)",{count:"exact",head:true}).eq("schedule_id",scheduleId).in("status",["registered","completed"]).neq("profiles.role","staff"),
+    schedule.staff_in_capacity ? admin.from("schedule_participations").select("*",{count:"exact",head:true}).eq("schedule_id",scheduleId).in("status",["registered","completed"]) : admin.from("schedule_participations").select("profiles:profiles!schedule_participations_user_id_fkey!inner(role)",{count:"exact",head:true}).eq("schedule_id",scheduleId).in("status",["registered","completed"]).neq("profiles.role","staff"),
     admin.from("pace_groups").select("pace_group_id,pace_seconds,distance_km").eq("schedule_id",scheduleId).order("pace_seconds"),
   ]);
-  const canParticipate=profile.account_status==="active"&&profile.approval_status==="approved"&&["guest","member","staff"].includes(profile.role);
+  const canParticipate=canStartActivity(profile)&&["guest","member","staff"].includes(profile.role);
 
   return <main className="mx-auto min-h-screen max-w-4xl px-6 py-12">
     <Link href="/schedules" className="text-sm font-semibold text-emerald-700">← 일정 목록</Link>
@@ -42,10 +42,10 @@ export default async function ScheduleDetailPage({params}:Props){
       <dl className="mt-8 grid gap-5 rounded-2xl bg-zinc-50 p-6 sm:grid-cols-2"><div><dt className="text-sm text-zinc-500">일정 시간</dt><dd className="mt-1 font-semibold">{new Date(schedule.start_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</dd></div><div><dt className="text-sm text-zinc-500">장소</dt><dd className="mt-1 font-semibold">{schedule.location}</dd></div><div><dt className="text-sm text-zinc-500">신청 마감</dt><dd className="mt-1 font-semibold">{new Date(schedule.registration_end_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</dd></div><div><dt className="text-sm text-zinc-500">정원</dt><dd className="mt-1 font-semibold">{schedule.capacity?`${schedule.capacity}명`:"제한 없음"}</dd></div></dl>
       {imageUrl && <Image unoptimized src={imageUrl} alt="정기런 안내 사진" width={1200} height={675} className="mt-8 max-h-[32rem] w-full rounded-2xl object-contain" />}
       <div className="mt-8 whitespace-pre-wrap leading-7 text-zinc-700">{schedule.description||"상세 설명이 없습니다."}</div>
-      {schedule.status==="cancelled"?<div className="mt-8 rounded-2xl bg-red-50 p-5 text-red-800">취소된 일정입니다.{schedule.cancellation_reason?` 사유: ${schedule.cancellation_reason}`:""}</div>:<ParticipationPanel scheduleId={scheduleId} scheduleType={schedule.schedule_type} scheduleStatus={schedule.status} participantCount={participantCount??0} capacity={schedule.capacity} capacityExempt={profile.role==="staff"&&!schedule.staff_in_capacity} registrationStartAt={schedule.registration_start_at} registrationEndAt={schedule.registration_end_at} cancellationDeadlineAt={schedule.cancellation_deadline_at} participation={participation} canParticipate={canParticipate} paceGroups={paceGroups??[]} canCreatePaceGroup={isStaffOrAdmin(profile)||(schedule.schedule_type==="flash"&&(canManage||Boolean(participation)))}/>}
+      {schedule.status==="cancelled"?<div className="mt-8 rounded-2xl bg-red-50 p-5 text-red-800">취소된 일정입니다.{schedule.cancellation_reason?` 사유: ${schedule.cancellation_reason}`:""}</div>:<ParticipationPanel maintenanceBlocked={Boolean(profile.service_blocked?.participation)} canChangeGroup={canStartActivity(profile)} scheduleId={scheduleId} scheduleType={schedule.schedule_type} scheduleStatus={schedule.status} participantCount={participantCount??0} capacity={schedule.capacity} capacityExempt={profile.role==="staff"&&!schedule.staff_in_capacity} registrationStartAt={schedule.registration_start_at} registrationEndAt={schedule.registration_end_at} cancellationDeadlineAt={schedule.cancellation_deadline_at} participation={participation} canParticipate={canParticipate} paceGroups={paceGroups??[]} canCreatePaceGroup={isStaffOrAdmin(profile)||(canStartActivity(profile)&&schedule.schedule_type==="flash"&&(canManage||Boolean(participation)))}/>}
       
       <AttendancePanel scheduleId={scheduleId} canManage={canManage}/>
-      {schedule.comment_enabled&&<CommentPanel scheduleId={scheduleId} currentUserId={profile.user_id} canNotice={isStaffOrAdmin(profile)}/>}
+      {schedule.comment_enabled&&<CommentPanel scheduleId={scheduleId} currentUserId={profile.user_id} maintenanceBlocked={Boolean(profile.service_blocked?.comments)} canWrite={canStartActivity(profile)} canNotice={isStaffOrAdmin(profile)}/>}
     </section>
   </main>;
 }

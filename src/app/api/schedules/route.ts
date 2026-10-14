@@ -1,3 +1,4 @@
+import { canUseService } from "@/lib/auth/account-access";
 import { parsePaceGroups } from "@/lib/regular-run-templates";
 import { publicSchedule } from "@/lib/public-data";
 import { fail, ok } from "@/lib/api-response";
@@ -7,7 +8,7 @@ import { validateSchedulePayload } from "@/lib/validation/schedule";
 
 export async function GET() {
   const profile = await getCurrentProfile();
-  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+  if (!profile || !canUseService(profile)) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
 
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin

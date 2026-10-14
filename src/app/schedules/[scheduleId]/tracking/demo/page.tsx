@@ -1,3 +1,4 @@
+import {canUseService} from "@/lib/auth/account-access";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/current-user";
@@ -8,7 +9,7 @@ export const metadata = { title: "대회 추적 데모 | 01Runners" };
 export default async function EventTrackingDemoPage({ params }: { params: Promise<{ scheduleId: string }> }) {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
-  if (profile.account_status !== "active") redirect("/account-status");
+  if (!canUseService(profile)) redirect("/account-status");
   if (profile.approval_status !== "approved" || profile.role === "pending") redirect("/pending");
   const { scheduleId } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scheduleId)) notFound();

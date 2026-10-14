@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BackNavigation } from "@/components/navigation/back-navigation";
 import "./globals.css";
+import { MaintenancePopup } from "@/components/service/maintenance-popup";
+import { ServiceAccessMonitor } from "@/components/service/service-access-monitor";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,7 +30,7 @@ export default function RootLayout({
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col"><BackNavigation />{children}</body>
+      <body className="min-h-full flex flex-col"><ServiceAccessMonitor /><MaintenancePopup><BackNavigation />{children}</MaintenancePopup></body>
     </html>
   );
 }

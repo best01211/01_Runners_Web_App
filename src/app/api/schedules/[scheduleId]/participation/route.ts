@@ -1,3 +1,4 @@
+import { canUseService } from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin, type CurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -36,7 +37,7 @@ function participationFailure(error: {code:string;message:string;details?:string
 
 export async function GET(_request: Request,{params}:Context){
   const profile=await getCurrentProfile();
-  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
+  if (!profile || !canUseService(profile)) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
   const {scheduleId}=await params;
   const supabase=await createSupabaseServerClient();
   const {data,error}=await supabase.from("schedule_participations")
@@ -61,7 +62,7 @@ export async function POST(request: Request,{params}:Context){if (request.header
 
 export async function DELETE(request: Request,{params}:Context){if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
   const profile=await getCurrentProfile();
-  if (!profile || profile.account_status !== "active" || profile.approval_status !== "approved") return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
+  if (!profile || !canUseService(profile)) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
   const {scheduleId}=await params;
   let reason="";
   try{ const body=await request.json(); reason=String(body.reason??"").trim(); }catch{}

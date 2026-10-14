@@ -16,7 +16,9 @@
     "test:member-deletion-db": "node scripts/test-member-deletion-database.mjs",
     "test:operational-enums-db": "node scripts/test-operational-enums-database.mjs",
     "test:pace-group-unification-db": "node scripts/test-pace-group-unification-database.mjs",
-    "test:template-groups-db": "node scripts/test-template-groups-database.mjs"
+    "test:template-groups-db": "node scripts/test-template-groups-database.mjs",
+    "test:restricted-access-db": "node scripts/test-restricted-access-database.mjs",
+    "test:service-restrictions-db": "node scripts/test-service-restrictions-database.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
