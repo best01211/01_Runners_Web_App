@@ -1,16 +1,23 @@
 import Link from "next/link";
 import {Icon} from "@/components/ui/icon";
 import {scheduleTypeLabels,scheduleStatusLabels} from "@/lib/schedule-labels";
+import {scheduleProgress,type ScheduleSummary} from '@/lib/schedule-overview';
+export type {ScheduleSummary} from '@/lib/schedule-overview';
 
-export type ScheduleSummary={schedule_id:string;title:string;schedule_type:string;status:string;location:string;start_at:string;registration_end_at:string;capacity:number|null};
-export function ScheduleCard({schedule,now,featured=false}:{schedule:ScheduleSummary;now:string;featured?:boolean}) {
-  const date=new Date(schedule.start_at);
-  const day=date.toLocaleDateString('ko-KR',{day:'2-digit',timeZone:'Asia/Seoul'}).replace(/\D/g,'');
-  const month=date.toLocaleDateString('en-US',{month:'short',timeZone:'Asia/Seoul'}).toUpperCase();
-  const status=schedule.status==='open'&&Date.parse(schedule.registration_end_at)<Date.parse(now)?'모집 마감':scheduleStatusLabels[schedule.status]??schedule.status;
-  return <Link href={`/schedules/${schedule.schedule_id}`} className={featured?"schedule-card featured-event":"schedule-card"}>
-    <div className="schedule-date"><small>{featured?`${date.toLocaleDateString('ko-KR',{month:'numeric',timeZone:'Asia/Seoul'}).replace(/\D/g,'')}월`:month}</small><strong>{day}</strong><span>{date.toLocaleDateString('ko-KR',{weekday:'short',timeZone:'Asia/Seoul'})}{!featured&&` · ${date.toLocaleDateString('en-US',{year:'numeric',timeZone:'Asia/Seoul'})}`}</span></div>
-    <div className="schedule-card-content"><div className="flex flex-wrap items-center gap-2"><span className={`run-badge type-${schedule.schedule_type}`}>{scheduleTypeLabels[schedule.schedule_type]??schedule.schedule_type}</span><span className={`schedule-status ${status==='모집 중'?'is-open':''}`}><i/>{status}</span></div><h2>{schedule.title}</h2><div className="schedule-meta"><span><Icon name="clock" size={15}/>{date.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Seoul'})}</span><span><Icon name="pin" size={15}/>{schedule.location}</span>{schedule.capacity!==null&&<span><Icon name="users" size={15}/>정원 {schedule.capacity}명</span>}</div><p className="schedule-deadline">신청 마감 {new Date(schedule.registration_end_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Seoul'})}</p></div>
-    <span className="schedule-card-arrow">{featured&&<span>일정 보기</span>}<Icon name="arrow"/></span>
-  </Link>;
+export function ScheduleCard({schedule,now,featured=false}:{schedule:ScheduleSummary;now:string;featured?:boolean}){
+ const date=new Date(schedule.start_at),zone='Asia/Seoul';
+ const progress=scheduleProgress(schedule,now);
+ const status=progress==='종료'||progress==='취소'?progress:schedule.status==='open'&&Date.parse(schedule.registration_end_at)<Date.parse(now)?'모집 마감':scheduleStatusLabels[schedule.status]??schedule.status;
+ const dateText=date.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short',timeZone:zone});
+ const startText=date.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:zone});
+ const deadline= new Date(schedule.registration_end_at).toLocaleString('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:zone});
+ const badges=<div className="flex flex-wrap items-center gap-2"><span className={`run-badge type-${schedule.schedule_type}`}>{scheduleTypeLabels[schedule.schedule_type]??schedule.schedule_type}</span><span className={`schedule-status ${status==='모집 중'?'is-open':''}`}><i/>{status}</span>{!['종료','취소'].includes(progress)&&<span className="schedule-progress">{progress==='진행 중'?'진행 중 · 미종료':'시작 전 · 미종료'}</span>}</div>;
+ const dateBlock=<div className="schedule-date" aria-label={dateText}><small>{date.toLocaleDateString('ko-KR',{month:'numeric',timeZone:zone}).replace(/\D/g,'')}월</small><strong>{date.toLocaleDateString('ko-KR',{day:'2-digit',timeZone:zone}).replace(/\D/g,'')}</strong><span>{date.toLocaleDateString('ko-KR',{weekday:'short',timeZone:zone})}</span></div>;
+ const meta=<div className="schedule-meta"><span><Icon name="calendar" size={15}/>{dateText}</span><span><Icon name="clock" size={15}/>시작 {startText}</span><span><Icon name="pin" size={15}/>{schedule.location}</span></div>;
+ return <Link href={`/schedules/${schedule.schedule_id}`} className={featured?'schedule-card featured-event':'schedule-card'}>
+  {featured&&<h2>{schedule.title}</h2>}{dateBlock}
+  <div className="schedule-card-content">{!featured&&badges}{!featured&&<h2>{schedule.title}</h2>}{meta}{featured&&<div className="featured-status">{badges}</div>}{!featured&&<><p className="schedule-deadline">신청 마감 {deadline}</p>{schedule.capacity!==null&&<p className="schedule-deadline">정원 {schedule.capacity}명</p>}</>}</div>
+  {featured&&<div className="featured-registration"><p>신청 마감 {deadline}</p>{schedule.capacity!==null&&<p>정원 {schedule.capacity}명</p>}</div>}
+  <span className="schedule-card-arrow">{featured&&<span>{progress==='취소'?'취소된 일정 확인':'일정 상세 확인'}</span>}<Icon name="arrow"/></span>
+ </Link>;
 }

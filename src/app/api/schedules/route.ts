@@ -34,6 +34,7 @@ export async function POST(request: Request) {if (request.headers.get("origin") 
   const groupPayload = body.paceGroups === undefined ? null : parsePaceGroups(body.paceGroups);
   if (body.paceGroups !== undefined && !groupPayload) return fail("INVALID_PACE_GROUPS", "페이스 그룹은 중복 없이 30초·5km 단위로 입력해주세요.", 400);
   if (parsed.value!.schedule_type === "regular" && groupPayload && !groupPayload.length) return fail("PACE_GROUP_REQUIRED", "정기런에는 페이스 그룹을 한 개 이상 추가해주세요.", 400);
+  if(parsed.value!.schedule_type==="event"&&groupPayload?.length)return fail("INVALID_PACE_GROUPS","이벤트에는 페이스 그룹을 등록하지 않습니다.",400);
   const canCreate = isStaffOrAdmin(profile) || (profile.role === "member" && parsed.value!.schedule_type === "flash");
   if (!canCreate) return fail("FORBIDDEN", "일반 회원은 번개런만 생성할 수 있습니다.", 403);
 
@@ -53,7 +54,7 @@ export async function POST(request: Request) {if (request.headers.get("origin") 
 
   if (error) {
     console.error(error);
-    return fail("SCHEDULE_CREATE_FAILED", "일정 생성에 실패했습니다. 페이스 그룹을 입력했다면 015 SQL 적용 상태를 확인해주세요.", 500);
+    return fail("SCHEDULE_CREATE_FAILED", parsed.value!.schedule_type==="event"?"이벤트 생성에 실패했습니다. SQL(023) 적용 여부를 확인해주세요.":"일정 생성에 실패했습니다. 페이스 그룹을 입력했다면 015 SQL 적용 상태를 확인해주세요.", 500);
   }
   // Creator participation is inserted atomically by migration 009.
   return ok({ schedule: publicSchedule(data) }, 201);

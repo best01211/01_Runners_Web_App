@@ -1,13 +1,51 @@
 import {canAdminister} from "@/lib/auth/account-access";
-import { MemberDelete } from "@/components/admin/member-delete";
+import {MemberDelete} from "@/components/admin/member-delete";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/auth/current-user";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { MemberActions } from "@/components/admin/member-actions";
-import { WithdrawalActions } from "@/components/admin/withdrawal-actions";
-import { SeasonManager } from "@/components/admin/season-manager";
-import { OperationsSettings } from "@/components/admin/operations-settings";
+import {redirect} from "next/navigation";
+import {getCurrentProfile,isStaffOrAdmin} from "@/lib/auth/current-user";
+import {createSupabaseAdminClient} from "@/lib/supabase/admin";
+import {MemberDirectory} from "@/components/admin/member-directory";
+import {WithdrawalActions} from "@/components/admin/withdrawal-actions";
+import {SeasonManager} from "@/components/admin/season-manager";
+import {loadRegularTemplates} from "@/lib/regular-run-templates-server";
+import {RegularTemplateManager} from "@/components/schedules/regular-template-manager";
+import {OperationsSettings} from "@/components/admin/operations-settings";
 
-export default async function AdminPage(){const profile=await getCurrentProfile();if(!profile||!canAdminister(profile))redirect("/dashboard");const admin=createSupabaseAdminClient();const[{data:members},{data:withdrawals},{data:settings},{data:seasons}]=await Promise.all([admin.from("profiles").select("user_id,login_id,name,email,role,staff_position,account_status,approval_status,ranking_excluded,is_pacer,created_at").order("created_at",{ascending:false}),admin.from("withdrawal_requests").select("*,profiles:user_id(name,login_id)").in("status",["pending","approved"]).is("auth_deleted_at",null),admin.from("system_settings").select("*"),admin.from("seasons").select("*").order("starts_on",{ascending:false})]);const {data:deletionJobs,error:deletionJobsError}=await admin.from("member_deletion_jobs").select("job_id,target_user_id,confirmation_login_id,status").neq("status","completed").order("created_at");const maintenance=(settings?.find(x=>x.setting_key==="maintenance")?.setting_value??{}) as Record<string,unknown>;const scorePolicy=(settings?.find(x=>x.setting_key==="score_policy")?.setting_value??{}) as Record<string,unknown>;return <main className="mx-auto min-h-screen max-w-6xl px-6 py-12"><header className="page-heading"><div><p className="eyebrow">운영진 전용</p><h1>크루 관리</h1><p className="page-description">회원, 시즌과 서비스 운영 상태를 관리합니다.</p></div><Link className="button-secondary" href="/dashboard">크루 홈</Link></header><section className="admin-stats"><Card label="전체 회원" value={members?.length??0}/><Card label="승인 대기" value={members?.filter(x=>x.approval_status==="pending").length??0}/><Card label="운영진" value={members?.filter(x=>x.role==="staff").length??0}/><Card label="탈퇴 대기" value={withdrawals?.length??0}/></section>{Boolean(withdrawals?.length)&&<section className="mt-10"><h2 className="text-xl font-black">탈퇴 승인</h2><div className="mt-4 space-y-2">{withdrawals?.map(w=><div key={w.request_id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-red-100 p-4 [overflow-wrap:anywhere]"><div><b>{Array.isArray(w.profiles)?w.profiles[0]?.name:w.profiles?.name}</b><p className="text-sm text-zinc-500">{w.reason||"사유 없음"}</p></div><WithdrawalActions requestId={w.request_id} retry={w.status==="approved"}/></div>)}</div></section>}{Boolean(deletionJobs?.length)&&<section className="mt-10 rounded-2xl border border-red-200 p-5"><h2 className="text-xl font-black">완료되지 않은 사용자 삭제</h2><p className="mt-2 text-sm text-zinc-600">DB 정보는 정리됐지만 사진 또는 인증 계정 삭제가 남아 있습니다.</p>{deletionJobs?.map(job=><div key={job.job_id} className="mt-4"><b>{job.confirmation_login_id??"삭제 대상 계정"}</b><MemberDelete userId={job.target_user_id} loginId={job.confirmation_login_id??""} name={job.confirmation_login_id??"삭제 대상"} retry/></div>)}</section>}<section className="mt-10"><h2 className="text-xl font-black">회원 관리</h2>{deletionJobsError&&<p className="mt-2 text-sm text-amber-700">사용자 삭제 기능을 사용하려면 011 SQL을 먼저 적용해주세요.</p>}<div className="mt-4 space-y-3">{members?.map(m=><article key={m.user_id} className="member-management-card grid min-w-0 gap-4 rounded-2xl border p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]"><div className="min-w-0 [overflow-wrap:anywhere]"><b>{m.name}</b><p className="text-sm text-zinc-500">{m.login_id} · {m.email}</p></div><MemberActions actorIsAdmin={profile.role==="admin"} self={m.user_id===profile.user_id} userId={m.user_id} role={m.role} position={m.staff_position} status={m.account_status} excluded={m.ranking_excluded} isPacer={m.is_pacer}/>{m.role!=="admin"&&m.user_id!==profile.user_id&&<div className="lg:col-span-2"><MemberDelete userId={m.user_id} loginId={m.login_id} name={m.name}/></div>}</article>)}</div></section><section className="mt-10"><h2 className="text-xl font-black">시즌 관리</h2><SeasonManager seasons={seasons??[]}/></section><section className="mt-10"><Link href="/schedules/templates" className="inline-flex min-h-11 rounded-xl border px-4 py-3 font-bold">정기런 양식 관리</Link></section><section className="mt-10"><h2 className="text-xl font-black">운영 설정</h2><OperationsSettings maintenance={maintenance} scorePolicy={scorePolicy}/></section></main>}
-function Card({label,value}:{label:string;value:number}){return <div className="admin-stat-card"><p className="text-sm text-zinc-500">{label}</p><b className="text-3xl">{value}</b></div>}
+
+export default async function AdminPage({searchParams}:{searchParams:Promise<{tab?:string}>}) {
+ const profile=await getCurrentProfile();if(!profile||!isStaffOrAdmin(profile))redirect('/dashboard');
+ const canEdit=canAdminister(profile),isAdmin=profile.role==='admin',client=createSupabaseAdminClient();
+ const tabs=[['members',canEdit?'회원 관리':'회원 조회'],...(canEdit?[['seasons','시즌 관리']]:[]),['templates','정기런 양식 관리'],...(canEdit?[['scores','환경 설정']]:[])];
+ const requested=(await searchParams).tab;if(requested==='operations'&&isAdmin)redirect('/admin/operations');if(requested==='season-settings'&&canEdit)redirect('/admin?tab=seasons');const tab=tabs.some(([key])=>key===requested)?requested:'members';
+ const heading=tabs.find(([key])=>key===tab)?.[1];
+ let members=null,seasons=null,setting=null,withdrawals=null;
+ const templates=tab==='templates'?await loadRegularTemplates():[];
+ if(tab==='members'){
+  let query=client.from('profiles').select('user_id,name,nickname,role,staff_position,account_status').order('created_at',{ascending:false});
+  if(!isAdmin)query=query.neq('role','admin');
+  const result=await query;if(result.error)throw new Error('회원 목록을 불러오지 못했습니다.');members=result.data;
+  if(canEdit){const result2=await client.from('withdrawal_requests').select('*,profiles:user_id(name,role)').in('status',['pending','approved']).is('auth_deleted_at',null);
+  withdrawals=(result2.data??[]).filter(w=>isAdmin||(Array.isArray(w.profiles)?w.profiles[0]?.role:w.profiles?.role)!=='admin');}
+ }
+ if(tab==='seasons'){const result=await client.from('seasons').select('*').order('starts_on',{ascending:false});if(result.error)throw new Error('시즌을 불러오지 못했습니다.');seasons=result.data;}
+ if(tab==='scores'){const result=await client.from('system_settings').select('setting_value').eq('setting_key','score_policy').maybeSingle();if(result.error)throw new Error('설정을 불러오지 못했습니다.');setting=result.data?.setting_value??{};}
+ return <main><header className="page-heading"><div><h1>크루 관리</h1><p className="page-description">회원과 시즌, 정기런 양식, 활동 환경을 관리합니다.</p></div><Link href="/dashboard" className="button-secondary">크루 홈</Link></header>
+ <nav className="management-tabs" aria-label="크루 관리 메뉴">{tabs.map(([key,label])=><Link key={key} href={`/admin?tab=${key}`} aria-current={tab===key?'page':undefined}>{label}</Link>)}</nav>
+ <section className="mt-6"><h2 className="mb-4 text-xl font-bold">{heading}</h2>
+ {tab==='members'&&<>{Boolean(withdrawals?.length)&&<section className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4"><h3 className="font-bold">탈퇴 승인</h3>{withdrawals?.map(w=><div key={w.request_id} className="mt-4 flex flex-wrap items-center justify-between gap-3"><span>{Array.isArray(w.profiles)?w.profiles[0]?.name:w.profiles?.name}</span><WithdrawalActions requestId={w.request_id} retry={w.status==='approved'}/></div>)}</section>}
+ {isAdmin&&<FailedDeletions/>}
+ <MemberDirectory members={members??[]} canEdit={canEdit} isAdmin={isAdmin} selfId={profile.user_id}/></>}
+ {tab==='seasons'&&<SeasonManager seasons={seasons??[]}/>}
+ {tab==='templates'&&<><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-zinc-600">정기런 양식을 추가·수정·삭제합니다. 날짜와 시간은 일정을 만들 때 입력합니다.</p></div><p className="mt-2 text-xs text-zinc-500">양식 정보 수정은 새 일정의 기본값에 적용됩니다. 사진 교체는 해당 양식을 사용하는 기존 일정에도 반영됩니다.</p><RegularTemplateManager templates={templates}/></>}
+
+ {tab==='scores'&&<><p className="mb-4 text-sm text-zinc-600">출석·지각·페이서 활동 점수와 최소 활동 기준을 설정합니다.</p><OperationsSettings maintenance={{}} scorePolicy={setting??{}} scoresOnly/></>}
+
+ </section></main>;
+}
+
+async function FailedDeletions(){
+ const {data,error}=await createSupabaseAdminClient().from('member_deletion_jobs').select('job_id,target_user_id,confirmation_login_id,status').neq('status','completed').order('created_at');
+ if(error)return <p className="mb-4 text-sm text-amber-800">사용자 삭제 작업을 확인하지 못했습니다.</p>;
+ if(!data?.length)return null;
+ return <section className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4"><h3 className="font-bold">완료되지 않은 사용자 삭제</h3>{data.map(job=><div key={job.job_id} className="mt-3"><b>{job.confirmation_login_id??'삭제 대상 계정'}</b><MemberDelete userId={job.target_user_id} loginId={job.confirmation_login_id??''} name={job.confirmation_login_id??'삭제 대상'} retry/></div>)}</section>;
+}

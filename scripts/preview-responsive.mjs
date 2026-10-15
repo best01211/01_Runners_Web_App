@@ -36,6 +36,7 @@ const screens={
  profile:[card('내 정보',component('profile/profile-form#ProfileForm',{initial:{name:'테스트회원',email:'test@example.com',phone:'010-0000-0000',nickname:'테스트 회원',profile_image_url:null}})),component('profile/password-form#PasswordForm',{})],
  popup:[component('service/maintenance-popup#MaintenancePopup',{children:h('button',{'data-maintenance-blocked':true},'참가 신청')})],
 };
+screens["participation-joined"]=[card("러닝 참가",h(screens.schedule[1].type,{...screens.schedule[1].props,canCreatePaceGroup:false,participation:{participation_id:"preview-joined",status:"registered",participation_locked:false,pace_change_locked:false,pace_group_id:"test"}}))];
 const demoProfile={user_id:'preview-member',login_id:'preview_runner',name:'테스트러너',nickname:'테스트러너',role:'member',account_status:'active',approval_status:'approved',staff_position:null,profile_image_url:null};
 const demoNow='2026-10-15T00:00:00Z';
 const demoSchedules=[{schedule_id:'preview-run-1',title:'함께 달리는 한강 정기런',schedule_type:'regular',status:'open',location:'반포한강공원',start_at:'2026-10-17T08:00:00Z',registration_end_at:'2026-10-17T07:00:00Z',capacity:30},{schedule_id:'preview-run-2',title:'가볍게 시작하는 주말 아침 러닝',schedule_type:'flash',status:'open',location:'올림픽공원',start_at:'2026-10-18T00:00:00Z',registration_end_at:'2026-10-17T14:00:00Z',capacity:10}];
@@ -55,4 +56,3 @@ function html(screen){
  return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>2001 Runners 디자인 미리보기 · 가상 데이터</title><link rel="stylesheet" href="/styles.css"><style>:root{--font-geist-sans:Arial}</style></head><body>'+content+'</body></html>';
 }
 http.createServer((req,res)=>{if(req.url==="/branding/01runners-logo.png"){res.setHeader("Content-Type","image/png");res.end(fs.readFileSync("public/branding/01runners-logo.png"));return;}if(req.url==='/styles.css'){res.setHeader('Content-Type','text/css');res.end(css);return;}const key=(req.url??'/').slice(1);res.setHeader('Content-Type','text/html; charset=utf-8');res.end(screens[key]?html(key):'<h1>반응형 점검</h1>'+Object.keys(screens).map(k=>'<p><a href="/'+k+'">'+k+'</a></p>').join(''));}).listen(3101,'127.0.0.1',()=>console.log('Responsive preview ready: http://localhost:3101 (static fixtures only)'));
-

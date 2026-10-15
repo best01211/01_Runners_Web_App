@@ -21,7 +21,7 @@ test("uploads reject incorrect WebP signatures, lengths and excess size", () => 
 });
 test("schedule writes discard image URLs even when supplied directly", () => {
   for (const scheduleType of ["regular", "flash", "training", "event"]) {
-    const result = validateSchedulePayload({ title: "러닝 일정", scheduleType, location: "서울", startAt: "2026-10-13T19:00", endAt: "2026-10-13T20:00", registrationEndAt: "2026-10-13T18:00", imageUrl: "https://evil.test/image.jpg", courseImageUrl: "https://evil.test/course.jpg" });
+    const result = validateSchedulePayload({ title: "러닝 일정", scheduleType,eventKind:"race",registrationStartAt:"2026-10-12T09:00", location: "서울", startAt: "2026-10-13T19:00", endAt: "2026-10-13T20:00", registrationEndAt: "2026-10-13T18:00", imageUrl: "https://evil.test/image.jpg", courseImageUrl: "https://evil.test/course.jpg" });
     assert.ok(result.value); assert.equal(result.value.image_url, null); assert.equal(result.value.course_image_url, null);
   }
 });

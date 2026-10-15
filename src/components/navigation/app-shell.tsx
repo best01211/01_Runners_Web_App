@@ -43,7 +43,7 @@ export function AppShell({children}:{children:ReactNode}) {
       <Link href="/dashboard" className="club-brand" aria-label="2001 Runners 홈"><Brand/><span>RUNNERS</span></Link>
       <nav aria-label="주 메뉴" className="desktop-nav">{links.map(navLink)}</nav>
       <div className="club-header-actions">
-        {identity&&["staff","admin"].includes(identity.role)&&<details className="staff-menu"><summary>운영<Icon name="chevron" size={13}/></summary><nav aria-label="운영 메뉴"><Link href="/staff/members/pending">가입 승인</Link>{canAdminister(identity)&&<Link href="/admin">크루 관리</Link>}</nav></details>}
+        {identity&&["staff","admin"].includes(identity.role)&&<details className="staff-menu"><summary>운영<Icon name="chevron" size={13}/></summary><nav aria-label="운영 메뉴"><Link href="/staff/members/pending">가입 승인</Link><Link href="/admin">{canAdminister(identity)?"크루 관리":"회원 조회"}</Link>{identity.role==="admin"&&<Link href="/admin/operations">관리자 · 운영 설정</Link>}</nav></details>}
         <Link href="/profile" className="shell-account" aria-label="내 정보"><span className="account-avatar">{name?.slice(0,1)||<Icon name="user" size={17}/>}</span><span className="account-name">{name||"내 정보"}</span></Link>
         <form action="/api/auth/logout" method="post"><button className="logout-button" aria-label="로그아웃" title="로그아웃"><Icon name="logout" size={18}/></button></form>
       </div>
@@ -54,5 +54,3 @@ export function AppShell({children}:{children:ReactNode}) {
     <nav aria-label="모바일 주 메뉴" className="mobile-nav">{links.map(navLink)}</nav>
   </div>;
 }
-
-

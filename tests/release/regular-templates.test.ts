@@ -10,7 +10,7 @@ test("regular templates validate names, locations, description and capacity", ()
 });
 test("only regular schedules retain valid template references", () => {
   const id = "11111111-1111-4111-8111-111111111111";
-  const body = { title:"정기런",location:"잠실",startAt:"2026-10-13T19:00",endAt:"2026-10-13T20:00",registrationEndAt:"2026-10-13T18:00" };
+  const body = { title:"정기런",location:"잠실",startAt:"2026-10-13T19:00",endAt:"2026-10-13T20:00",registrationEndAt:"2026-10-13T18:00",registrationStartAt:"2026-10-12T09:00",eventKind:"race" };
   assert.equal(validateSchedulePayload({...body,scheduleType:"regular",regularTemplateId:id}).value?.regular_template_id,id);
   assert.ok(validateSchedulePayload({...body,scheduleType:"regular",regularTemplateId:"invalid"}).error);
   for (const scheduleType of ["flash","event","training"]) assert.equal(validateSchedulePayload({...body,scheduleType,regularTemplateId:id}).value?.regular_template_id,null);

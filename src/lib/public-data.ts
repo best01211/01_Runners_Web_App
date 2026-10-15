@@ -5,8 +5,9 @@ export function publicSchedule<T extends Record<string, unknown>>(schedule: T) {
   return visible;
 }
 
-export function publicComment<T extends { deleted_at: unknown; content: string }>(comment: T) {
-  return comment.deleted_at ? { ...comment, content: "" } : comment;
+export function publicComment<T extends { deleted_at: unknown; content: string;deleted_by?:unknown;deleted_by_author?:unknown }>(comment: T) {
+  const {deleted_by:_deletedBy,deleted_by_author:_byAuthor,...visible}=comment;void _deletedBy;void _byAuthor;
+  return (comment.deleted_at ? { ...visible, content: "" } : visible) as T;
 }
 
 export function safeNextPath(value: string | null) {

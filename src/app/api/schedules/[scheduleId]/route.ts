@@ -43,7 +43,11 @@ export async function PATCH(request: Request, { params }: Context) {if (request.
     if (!template) return fail("INVALID_TEMPLATE", "삭제되었거나 존재하지 않는 양식입니다.", 409);
   }
   const { data, error } = await admin.from("schedules").update(parsed.value!).eq("schedule_id", scheduleId).select().single();
-  if (error) return fail("SCHEDULE_UPDATE_FAILED", "일정 수정에 실패했습니다.", 500);
+  if(error){
+    if(error.message.includes('EVENT_TYPE_HAS_PARTICIPANTS'))return fail('EVENT_TYPE_HAS_PARTICIPANTS','참가자가 있는 이벤트는 일정 유형이나 대회·행사 분류를 변경할 수 없습니다.',409);
+    if(error.message.includes('EVENT_CAPACITY_BELOW_COUNT'))return fail('EVENT_CAPACITY_BELOW_COUNT','정원은 현재 신청 인원보다 적게 설정할 수 없습니다.',409);
+    return fail("SCHEDULE_UPDATE_FAILED", "일정 수정에 실패했습니다. 이벤트는 SQL(023) 적용 여부를 확인해주세요.", 500);
+  }
   return ok({ schedule: publicSchedule(data) });
 }
 

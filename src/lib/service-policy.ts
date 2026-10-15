@@ -33,7 +33,7 @@ export function canAccessDuringService(setting: MaintenanceSetting,profile:{role
 export function requestFeature(path:string,method:string):ServiceFeature|null{
   if((path==="/api/schedules"&&method==="POST")||(path==="/schedules/new"&&method==="GET"))return "scheduleCreation";
   if((/^\/api\/schedules\/[^/]+\/comments$/.test(path)&&method==="POST")||(/^\/api\/comments\/[^/]+$/.test(path)&&method==="PATCH"))return "comments";
-  if(/^\/api\/schedules\/[^/]+\/participation$/.test(path)&&["POST","PATCH"].includes(method))return "participation";
+  if(/^\/api\/schedules\/[^/]+\/(?:participation|event-participation)$/.test(path)&&["POST","PATCH"].includes(method))return "participation";
   if(["/api/profile","/api/profile/password"].includes(path)&&method==="PATCH")return "profile";
   return null;
 }

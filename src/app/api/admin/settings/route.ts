@@ -7,7 +7,7 @@ import {parseMaintenanceSetting} from "@/lib/service-policy";
 export async function GET() {
  const p = await getCurrentProfile();
  if (!p || !canAdminister(p)) return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
- const { data, error } = await createSupabaseAdminClient().from("system_settings").select("*");
+ let query=createSupabaseAdminClient().from("system_settings").select("*"); if(p.role!=="admin")query=query.eq("setting_key","score_policy"); const {data,error}=await query;
  return error ? fail("DATABASE_ERROR", "설정을 불러오지 못했습니다.", 500) : ok({ settings: data });
 }
 export async function PUT(request: Request) {if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
@@ -16,6 +16,7 @@ export async function PUT(request: Request) {if (request.headers.get("origin") !
  let body;
  try { body = await request.json(); } catch { return fail("INVALID_JSON", "입력값을 확인해주세요."); }
  if (!body || !["maintenance", "score_policy"].includes(body.key)) return fail("INVALID_KEY", "설정 항목이 올바르지 않습니다.");
+ if(body.key==="maintenance"&&p.role!=="admin")return fail("FORBIDDEN","서비스 운영 설정은 관리자만 변경할 수 있습니다.",403);
  let value = body.value;
  if (body.key === "score_policy") {
   value = parseScorePolicy(value);

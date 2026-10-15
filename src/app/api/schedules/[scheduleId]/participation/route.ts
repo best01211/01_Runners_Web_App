@@ -2,6 +2,7 @@ import { canUseService } from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin, type CurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {createSupabaseAdminClient} from "@/lib/supabase/admin";
 
 
 type Context = { params: Promise<{ scheduleId: string }> };
@@ -41,11 +42,14 @@ export async function GET(_request: Request,{params}:Context){
   const {scheduleId}=await params;
   const supabase=await createSupabaseServerClient();
   const {data,error}=await supabase.from("schedule_participations")
-    .select("participation_id,schedule_id,user_id,status,registered_at,cancelled_at,cancellation_reason,participation_locked,pace_change_locked")
+    .select("participation_id,schedule_id,user_id,status,registered_at,cancelled_at,cancellation_reason,participation_locked,pace_change_locked,pace_group_id")
     .eq("schedule_id",scheduleId).eq("user_id",profile.user_id)
     .in("status",["registered","completed"]).maybeSingle();
   if(error) return fail("DATABASE_ERROR","내 참가 정보를 불러오지 못했습니다.",500);
-  return ok({participation:data});
+  const {data:groups,error:groupError}=await createSupabaseAdminClient().from("schedule_participations").select("pace_group_id").eq("schedule_id",scheduleId).in("status",["registered","completed"]).limit(5001);
+  if(groupError||(groups?.length??0)>5000)return fail("DATABASE_ERROR","그룹별 인원을 불러오지 못했습니다.",500);
+  const groupCounts:Record<string,number>={};for(const row of groups??[]){const key=row.pace_group_id??'none';groupCounts[key]=(groupCounts[key]??0)+1;}
+  return ok({participation:data,groupCounts});
 }
 
 export async function POST(request: Request,{params}:Context){if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);

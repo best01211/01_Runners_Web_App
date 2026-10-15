@@ -50,6 +50,7 @@ export async function GET(_: Request, { params }: Context) {
  if((entries?.length??0)>500)return fail("CAPACITY_LIMIT","대회당 최대 500명을 지원합니다.",409);
  const ids=(entries??[]).map(e=>e.user_id);
  let query=c.admin.from("profiles").select("user_id,nickname,name").eq("account_status","active").eq("approval_status","approved");
+ if(c.profile.role!=="admin")query=query.neq("role","admin");
  if(!c.canManage)query=query.in("user_id",ids.length?ids:["00000000-0000-0000-0000-000000000000"]);
  const {data:profiles,error:profileError}=await query.limit(500);
  if(profileError)return databaseFailure(profileError.code);

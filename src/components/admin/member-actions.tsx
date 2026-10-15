@@ -6,6 +6,8 @@ import {useRouter} from "next/navigation";
 type Props = {
   userId:string; role:string; position:string|null; status:string;
   excluded:boolean; isPacer?:boolean; actorIsAdmin?:boolean; self?:boolean;
+  onUpdated?:()=>void;
+  statusOnly?:boolean;
 };
 const roles:Record<string,string>={pending:"승인 대기/거절",guest:"게스트",member:"회원",staff:"운영진",admin:"관리자"};
 const positions:Record<string,string>={staff:"일반 운영진",vice_president:"부회장",president:"회장"};
@@ -17,7 +19,7 @@ function FixedValue({label,value}:{label:string;value:string}) {
   </div>;
 }
 
-export function MemberActions({userId,role,position,status,excluded,isPacer=false,actorIsAdmin=false,self=false}:Props) {
+export function MemberActions({userId,role,position,status,excluded,isPacer=false,actorIsAdmin=false,self=false,onUpdated,statusOnly=false}:Props) {
   const router=useRouter();
   const [busy,setBusy]=useState(false),[message,setMessage]=useState("");
   const protectedAdmin=!actorIsAdmin&&role==="admin";
@@ -31,9 +33,17 @@ export function MemberActions({userId,role,position,status,excluded,isPacer=fals
       const result=await response.json();
       if(!response.ok)throw new Error(result.error?.message??"회원 변경에 실패했습니다.");
       router.refresh();
+      onUpdated?.();
+      if(statusOnly)setMessage('계정 상태를 저장했습니다.');
     }catch(error){setMessage(error instanceof Error?error.message:"서버와 통신하지 못했습니다.")}
     finally{setBusy(false)}
   }
+  if(statusOnly)return <div className="space-y-3">
+    {readOnly?<FixedValue label="계정 상태" value={statuses[status]??status}/>:<label className="block text-sm">계정 상태<select aria-label="계정 상태" disabled={busy} value={status} onChange={e=>patch({accountStatus:e.target.value})} className="input mt-1"><option value="active">정상 (활성)</option><option value="restricted">신청 제한</option><option value="suspended">이용 정지</option></select></label>}
+    <p className="text-xs text-zinc-600">정상: 서비스 이용 가능 · 신청 제한: 조회 가능, 참가 신청 등 신규 활동 제한 · 이용 정지: 서비스 접근 차단</p>
+    {self&&<p className="text-sm text-zinc-500">본인 계정의 상태는 변경할 수 없습니다.</p>}
+    {message&&<p role="status" className="text-sm">{message}</p>}
+  </div>;
   return <div className="grid gap-2 sm:grid-cols-3">
     {readOnly||role==="admin"?<FixedValue label="등급" value={roles[role]??role}/>:<select aria-label="회원 등급" disabled={busy} value={role} onChange={e=>patch({role:e.target.value,staffPosition:e.target.value==="staff"?(position??"staff"):null})} className="min-h-11 rounded-lg border p-2">
       <option value="guest">게스트</option><option value="member">회원</option><option value="staff">운영진</option>{actorIsAdmin&&<option value="admin">관리자</option>}
