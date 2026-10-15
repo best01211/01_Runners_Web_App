@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BackNavigation } from "@/components/navigation/back-navigation";
 import "./globals.css";
+import { AppShell } from "@/components/navigation/app-shell";
 import { MaintenancePopup } from "@/components/service/maintenance-popup";
 import { ServiceAccessMonitor } from "@/components/service/service-access-monitor";
 
@@ -16,8 +17,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "01Runners",
-  description: "01Runners 크루 활동 관리 서비스",
+  title: "2001 Runners",
+  description: "2001 Runners 크루 활동 관리 서비스",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -30,7 +37,7 @@ export default function RootLayout({
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col"><ServiceAccessMonitor /><MaintenancePopup><BackNavigation />{children}</MaintenancePopup></body>
+      <body className="min-h-full flex flex-col"><ServiceAccessMonitor /><MaintenancePopup><AppShell><BackNavigation />{children}</AppShell></MaintenancePopup></body>
     </html>
   );
 }

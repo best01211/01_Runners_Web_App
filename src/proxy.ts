@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
   // Recovery routes must remain reachable even for pending or restricted accounts.
-  if (["/auth/forgot-password", "/auth/reset-password", "/auth/callback"].includes(pathname)) return response;
+  if (["/auth/forgot-password", "/auth/reset-password", "/auth/callback", "/auth/email-change"].includes(pathname)) return response;
 
   if (!user) {
     if (isPublicPath(pathname)) return response;
@@ -44,7 +44,7 @@ export async function proxy(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role,account_status,approval_status,is_pacer")
+    .select("role,account_status,approval_status,is_pacer,staff_position")
     .eq("user_id", user.id)
     .maybeSingle();
 

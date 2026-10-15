@@ -10,5 +10,5 @@ export default async function NewSchedulePage({ searchParams }: { searchParams: 
   const canManageTypes = isStaffOrAdmin(profile);
   const { type } = await searchParams;
   const templates = canManageTypes ? await loadRegularTemplates() : [];
-  return <main className="mx-auto min-h-screen max-w-2xl px-6 py-12"><p className="font-semibold text-emerald-600">01Runners</p><h1 className="mt-2 text-3xl font-bold">일정 만들기</h1><p className="mt-3 text-zinc-600">일반 회원은 번개런만 생성할 수 있습니다.</p><div className="mt-8"><ScheduleForm templates={templates} canManageTypes={canManageTypes} initial={canManageTypes && type === "event" ? { schedule_type: "event" } : undefined} /></div></main>;
+  return <main className="mx-auto min-h-screen max-w-2xl px-6 py-12"><header className="page-heading"><div><p className="eyebrow">일정 등록</p><h1>일정 만들기</h1><p className="page-description">러닝 시간, 장소와 모집 정보를 입력해주세요.</p></div></header>{!canManageTypes&&<p className="service-notice">일반 회원은 번개런을 만들 수 있습니다.</p>}<div className="form-surface"><ScheduleForm templates={templates} canManageTypes={canManageTypes} initial={canManageTypes && type === "event" ? { schedule_type: "event" } : undefined} /></div></main>;
 }

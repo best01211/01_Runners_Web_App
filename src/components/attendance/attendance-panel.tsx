@@ -30,7 +30,7 @@ export function AttendancePanel({ scheduleId, canManage }: { scheduleId: string;
     finally {setBusy(false)}
   }
   function check(event:FormEvent<HTMLFormElement>){event.preventDefault();void act({action:"check",code:new FormData(event.currentTarget).get("code")})}
-  return <section className="mt-8 rounded-2xl border p-6"><h2 className="text-xl font-bold">출석</h2>
+  return <section className="attendance-card mt-8 rounded-2xl border p-6"><h2 className="text-xl font-bold">출석</h2>
     {canManage&&<div className="mt-4 flex flex-wrap gap-2">{closed?<span>출석 종료됨</span>:!open?<button disabled={busy} onClick={()=>act({action:"open"})} className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white">출석 시작</button>:<><span className="rounded-xl bg-amber-50 px-4 py-2 font-black">번호 {code}</span><button disabled={busy} onClick={()=>{if(confirm("미확인 참가자는 불참으로 처리됩니다. 출석을 종료할까요?"))void act({action:"close"},"PATCH")}} className="rounded-xl bg-zinc-900 px-4 py-2 font-bold text-white">출석 종료</button></>}</div>}
     {!canManage&&<p className="mt-4" aria-live="polite">내 출석: {rows[0]?labels[rows[0].status] ?? rows[0].status:"출석 기록 없음"}{closed&&" · 출석 종료"}</p>}
     {open&&!canManage&&rows[0]?.status==="not_checked"&&<form onSubmit={check} className="mt-4 flex gap-2"><input required name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} className="input" placeholder="6자리 출석번호"/><button disabled={busy} className="rounded-xl bg-emerald-600 px-4 font-bold text-white">인증</button></form>}

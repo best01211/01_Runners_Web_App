@@ -18,7 +18,9 @@
     "test:pace-group-unification-db": "node scripts/test-pace-group-unification-database.mjs",
     "test:template-groups-db": "node scripts/test-template-groups-database.mjs",
     "test:restricted-access-db": "node scripts/test-restricted-access-database.mjs",
-    "test:service-restrictions-db": "node scripts/test-service-restrictions-database.mjs"
+    "test:service-restrictions-db": "node scripts/test-service-restrictions-database.mjs",
+    "test:executive-permissions-db": "node scripts/test-executive-permissions-database.mjs",
+    "test:profile-name-db": "node scripts/test-profile-name-database.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

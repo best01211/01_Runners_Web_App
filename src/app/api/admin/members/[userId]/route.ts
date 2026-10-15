@@ -20,6 +20,7 @@ export async function PATCH(request: Request, { params }: Context) {
     FORBIDDEN: "회원 변경 권한이 없습니다.", SELF_CHANGE: "본인의 권한과 상태는 변경할 수 없습니다.",
     WITHDRAWAL_PENDING: "탈퇴 신청을 먼저 승인하거나 반려해주세요.",
     INVALID_MEMBER_STATE: "탈퇴 완료 또는 미승인 계정은 변경할 수 없습니다.",
+    ADMIN_ACCOUNT_PROTECTED: "관리자 계정 변경과 관리자 지정은 관리자만 가능합니다.",
     ADMIN_ROLE_PROTECTED: "관리자 등급은 다른 등급으로 변경할 수 없습니다.",
     INVALID_STATUS: "탈퇴는 전용 탈퇴 승인 메뉴에서 처리해주세요.",
   };

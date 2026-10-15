@@ -1,5 +1,6 @@
+import {canAdminister} from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
-import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
+import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { UUID } from "@/lib/regular-run-templates";
 import { readJsonObject } from "@/lib/request-json";
@@ -15,7 +16,7 @@ function rpcError(message: string) {
 }
 export async function GET(_request: Request, { params }: Context) {
   const actor = await getCurrentProfile();
-  if (actor?.role !== "admin" || !isStaffOrAdmin(actor)) return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
+  if (!actor || !canAdminister(actor)) return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
   const { userId } = await params;
   if (!UUID.test(userId)) return fail("INVALID_ID", "회원 정보를 확인해주세요.");
   const { data, error } = await createSupabaseAdminClient().rpc("inspect_member_deletion", { actor_user_id: actor.user_id, target_user_id: userId });
@@ -25,7 +26,7 @@ export async function GET(_request: Request, { params }: Context) {
 export async function DELETE(request: Request, { params }: Context) {
   if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN", "허용되지 않은 요청입니다.", 403);
   const actor = await getCurrentProfile();
-  if (actor?.role !== "admin" || !isStaffOrAdmin(actor)) return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
+  if (!actor || !canAdminister(actor)) return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
   const { userId } = await params;
   const body = await readJsonObject(request);
   if (!UUID.test(userId) || typeof body?.confirmation !== "string" || !body.confirmation.trim()) return fail("INVALID_CONFIRMATION", "삭제할 회원의 아이디를 입력해주세요.");

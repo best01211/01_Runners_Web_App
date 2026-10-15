@@ -1,3 +1,4 @@
+import {canAdminister} from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -6,7 +7,7 @@ export async function POST(request: Request) {
  if(request.headers.get("origin")!==new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);
  const p=await getCurrentProfile();
  if(!p) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
- if(p.role!=="admin"||p.account_status!=="active"||p.approval_status!=="approved") return fail("FORBIDDEN","관리자만 대회를 등록할 수 있습니다.",403);
+ if(!canAdminister(p)||p.account_status!=="active"||p.approval_status!=="approved") return fail("FORBIDDEN","관리자만 대회를 등록할 수 있습니다.",403);
  let payload;
  try {
   const raw=await request.text(); if(raw.length>2000000)return fail("TOO_LARGE","요청 크기가 너무 큽니다.",413);

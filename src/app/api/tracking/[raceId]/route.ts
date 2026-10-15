@@ -1,3 +1,4 @@
+import {canAdminister} from "@/lib/auth/account-access";
 import {canUseService} from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile } from "@/lib/auth/current-user";
@@ -9,6 +10,20 @@ import type { Checkpoint } from "@/lib/race-tracking/types";
 
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ raceId: string }> };
+export async function DELETE(request: Request, { params }: Context) {
+ if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN", "허용되지 않은 요청입니다.", 403);
+ const profile = await getCurrentProfile();
+ if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
+ if (!canAdminister(profile)) return fail("FORBIDDEN", "관리자만 추적 이벤트를 삭제할 수 있습니다.", 403);
+ const { raceId } = await params;
+ if (!isUUID(raceId)) return fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404);
+ const admin = createSupabaseAdminClient();
+ // Keep related entries/checkpoints intact, and use the existing visibility policy.
+ const { data, error } = await admin.from("tracking_races").update({status:"archived"}).eq("race_id",raceId).select("race_id").maybeSingle();
+ if (error) return fail("DELETE_FAILED", "이벤트를 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.", 503);
+ if (!data) return fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404);
+ return ok({deleted:true});
+}
 async function context(raceId: string) {
  const profile = await getCurrentProfile();
  if (!profile) return { error: fail("UNAUTHORIZED", "로그인이 필요합니다.", 401) };
@@ -18,7 +33,7 @@ async function context(raceId: string) {
  const { data: schedule, error } = await admin.from("tracking_races").select("name,status").eq("race_id", raceId).maybeSingle();
  if (error) return { error: fail("DATABASE_ERROR", "이벤트를 불러오지 못했습니다.", 503) };
  if (!schedule || schedule.status !== "active") return { error: fail("NOT_FOUND", "진행 가능한 이벤트를 찾을 수 없습니다.", 404) };
- return { profile, admin, schedule, canManage: profile.role === "admin" && profile.account_status === "active" };
+ return { profile, admin, schedule, canManage: canAdminister(profile) };
 }
 function databaseFailure(code: string) {
  if (["42P01","PGRST205","PGRST202"].includes(code)) return fail("SETUP_REQUIRED", "추적 전용 DB 설정이 필요합니다. 관리자에게 알려주세요.", 503);

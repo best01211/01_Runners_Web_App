@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const password = String(body.password ?? "");
   if (!loginId || !password) return fail("VALIDATION_ERROR", "아이디와 비밀번호를 입력해 주세요.");
   const admin = createSupabaseAdminClient();
-  const { data: profile, error } = await admin.from("profiles").select("user_id,email,role,account_status,approval_status,is_pacer").eq("login_id", loginId).maybeSingle();
+  const { data: profile, error } = await admin.from("profiles").select("user_id,email,role,account_status,approval_status,is_pacer,staff_position").eq("login_id", loginId).maybeSingle();
   if (error) return fail("DATABASE_ERROR", "로그인 처리 중 오류가 발생했습니다.", 500);
   if (!profile) return fail("INVALID_CREDENTIALS", "아이디 또는 비밀번호가 올바르지 않습니다.", 401);
   if (profile.approval_status !== "approved" || profile.role === "pending") return fail("APPROVAL_REQUIRED", "회원 승인 후 로그인할 수 있습니다.", 403);

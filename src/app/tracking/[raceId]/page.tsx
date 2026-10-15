@@ -1,3 +1,5 @@
+import {DeleteRaceButton} from "@/components/race-tracking/delete-race-button";
+import {canAdminister} from "@/lib/auth/account-access";
 import {canUseService} from "@/lib/auth/account-access";
 import Link from "next/link";
 import { redirect,notFound } from "next/navigation";
@@ -15,5 +17,6 @@ export default async function TrackingRacePage({params}:{params:Promise<{raceId:
  const{data:race,error}=await createSupabaseAdminClient().from("tracking_races").select("name,status").eq("race_id",raceId).maybeSingle();
  if(error)return <main className="mx-auto max-w-2xl p-6"><Link href="/tracking">← 추적 목록</Link><p className="mt-6">추적 정보를 불러오지 못했습니다. DB 설정을 확인해주세요.</p></main>;
  if(!race||race.status!=="active")notFound();
- return <main className="mx-auto min-h-screen max-w-6xl px-4 py-8"><Link href="/tracking" className="text-sm font-semibold text-emerald-700">← 추적 목록</Link><TrackingTabs active="live" admin={p.role==="admin"&&p.account_status==="active"}/><LiveTracking scheduleId={raceId} apiPath={`/api/tracking/${raceId}`} title={race.name}/></main>;
+ return <main className="mx-auto min-h-screen max-w-6xl px-4 py-8"><Link href="/tracking" className="text-sm font-semibold text-emerald-700">← 추적 목록</Link><TrackingTabs active="live" admin={canAdminister(p)}/>{canAdminister(p)&&<div className="my-4 flex justify-end"><DeleteRaceButton raceId={raceId} name={race.name} redirectAfter/></div>}<LiveTracking scheduleId={raceId} apiPath={`/api/tracking/${raceId}`} title={race.name}/></main>;
 }
+

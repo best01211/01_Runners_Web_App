@@ -34,10 +34,9 @@ export default async function ScheduleDetailPage({params}:Props){
   ]);
   const canParticipate=canStartActivity(profile)&&["guest","member","staff"].includes(profile.role);
 
-  return <main className="mx-auto min-h-screen max-w-4xl px-6 py-12">
-    <Link href="/schedules" className="text-sm font-semibold text-emerald-700">← 일정 목록</Link>
-    <section className="mt-6 rounded-3xl border border-zinc-200 p-4 sm:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-semibold text-emerald-600">{scheduleTypeLabels[schedule.schedule_type]??schedule.schedule_type} · {scheduleStatusLabels[schedule.status]??schedule.status}</p><h1 className="mt-2 text-3xl font-bold">{schedule.title}</h1></div>
+  return <main className="mx-auto min-h-screen max-w-4xl px-6 py-12 [overflow-wrap:anywhere]">
+    <section className="schedule-detail mt-6 rounded-3xl border border-zinc-200 p-4 sm:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="detail-eyebrow text-sm font-semibold text-emerald-600">{scheduleTypeLabels[schedule.schedule_type]??schedule.schedule_type} · {scheduleStatusLabels[schedule.status]??schedule.status}</p><h1 className="mt-2 text-3xl font-bold">{schedule.title}</h1></div>
       {canManage&&schedule.status!=="cancelled"&&<div className="flex gap-2"><Link href={`/schedules/${scheduleId}/edit`} className="rounded-xl border border-zinc-300 px-4 py-2 font-semibold">수정</Link><CancelScheduleButton scheduleId={scheduleId}/></div>}</div>
       <dl className="mt-8 grid gap-5 rounded-2xl bg-zinc-50 p-6 sm:grid-cols-2"><div><dt className="text-sm text-zinc-500">일정 시간</dt><dd className="mt-1 font-semibold">{new Date(schedule.start_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</dd></div><div><dt className="text-sm text-zinc-500">장소</dt><dd className="mt-1 font-semibold">{schedule.location}</dd></div><div><dt className="text-sm text-zinc-500">신청 마감</dt><dd className="mt-1 font-semibold">{new Date(schedule.registration_end_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</dd></div><div><dt className="text-sm text-zinc-500">정원</dt><dd className="mt-1 font-semibold">{schedule.capacity?`${schedule.capacity}명`:"제한 없음"}</dd></div></dl>
       {imageUrl && <Image unoptimized src={imageUrl} alt="정기런 안내 사진" width={1200} height={675} className="mt-8 max-h-[32rem] w-full rounded-2xl object-contain" />}

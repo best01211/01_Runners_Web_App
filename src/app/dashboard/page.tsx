@@ -1,26 +1,17 @@
-import Link from "next/link";
-import Image from "next/image";
-import { redirect } from "next/navigation";
-import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
+import {redirect} from "next/navigation";
+import {getCurrentProfile} from "@/lib/auth/current-user";
+import {createSupabaseAdminClient} from "@/lib/supabase/admin";
+import {DashboardView} from "@/components/dashboard/dashboard-view";
+import {loadRanking} from "@/lib/ranking-server";
+import {canAdminister} from "@/lib/auth/account-access";
 
 export default async function DashboardPage() {
-  const profile = await getCurrentProfile();
-  if (!profile) redirect("/login");
-  return (
-    <main className="mx-auto min-h-screen max-w-5xl px-6 py-12">
-      <header className="flex items-center justify-between">
-        <div><p className="text-sm font-semibold text-emerald-600">01Runners</p><h1 className="mt-2 text-3xl font-bold">{profile.nickname ?? profile.name}님, 환영합니다</h1></div>
-        <form action="/api/auth/logout" method="post"><button className="rounded-xl border px-4 py-2 text-sm font-semibold">로그아웃</button></form>
-      </header>
-      {profile.account_status==="restricted"&&<p className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">신규 활동이 제한된 계정입니다. 일정·공지·랭킹 조회, 기존 참가 취소·출석 인증과 내 정보 관리는 가능합니다.</p>}<section className="mt-10 grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border p-6"><div className="flex items-center gap-4">{profile.profile_image_url && <Image unoptimized src={profile.profile_image_url} alt="내 프로필 사진" width={64} height={64} className="h-16 w-16 rounded-full object-cover" />}<div><h2 className="text-lg font-bold">회원 정보</h2><p className="mt-2 text-zinc-600">{{admin:"관리자",staff:"운영진",member:"회원",guest:"게스트",pending:"승인 대기"}[profile.role]} · {profile.approval_status === "approved" ? "승인 완료" : "승인 대기"}</p></div></div></article>
-        <Link href="/schedules" className="rounded-2xl border p-6"><h2 className="text-lg font-bold">일정</h2><p className="mt-3 text-zinc-600">러닝과 이벤트를 확인합니다.</p></Link>
-        <Link href="/tracking" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6"><h2 className="text-lg font-bold">대회 선수 추적</h2><p className="mt-3 text-zinc-600">대회 코스·배번호와 계측 기록으로 예상 위치를 확인합니다.</p></Link>
-        <Link href="/leaderboard" className="rounded-2xl border p-6"><h2 className="text-lg font-bold">랭킹</h2><p className="mt-3 text-zinc-600">시즌 활동 순위를 확인합니다.</p></Link>
-        <Link href="/profile" className="rounded-2xl border p-6"><h2 className="text-lg font-bold">내 정보</h2><p className="mt-3 text-zinc-600">개인정보와 프로필을 관리합니다.</p></Link>
-        {isStaffOrAdmin(profile) && <Link href="/staff/members/pending" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6"><h2 className="text-lg font-bold">가입 승인 관리</h2><p className="mt-3">승인 대기 회원을 확인합니다.</p></Link>}
-        {isStaffOrAdmin(profile) && profile.role === "admin" && <Link href="/admin" className="rounded-2xl bg-zinc-950 p-6 text-white"><h2 className="text-lg font-bold">관리자</h2><p className="mt-3 text-zinc-300">회원과 운영 정책을 관리합니다.</p></Link>}
-      </section>
-    </main>
-  );
+  const profile=await getCurrentProfile();
+  if(!profile)redirect("/login");
+  const now=new Date().toISOString();
+  const [scheduleResult,activityResult]=await Promise.allSettled([createSupabaseAdminClient().from("schedules")
+    .select("schedule_id,title,schedule_type,status,location,start_at,registration_end_at,capacity")
+    .is("deleted_at",null).neq("status","cancelled").gte("end_at",now).order("start_at").limit(3),loadRanking(undefined,canAdminister(profile),profile.user_id)]);
+  const schedules=scheduleResult.status==='fulfilled'?scheduleResult.value:null;
+  return <DashboardView profile={profile} schedules={schedules?.data??[]} now={now} scheduleError={!schedules||Boolean(schedules.error)} activity={activityResult.status==='fulfilled'?activityResult.value.personalActivity:null} activityError={activityResult.status==='rejected'}/>;
 }

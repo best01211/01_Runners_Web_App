@@ -2,7 +2,7 @@ import {parseMaintenanceSetting,type ServiceFeature} from "@/lib/service-policy"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canStartActivity } from "./account-access";
-export { canUseService, canStartActivity } from "./account-access";
+export { canUseService, canStartActivity, hasAdminAuthority, canAdminister } from "./account-access";
 
 export type CurrentProfile = {
   user_id: string;

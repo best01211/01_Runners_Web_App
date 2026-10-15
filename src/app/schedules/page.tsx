@@ -1,4 +1,5 @@
-import { scheduleTypeLabels, scheduleStatusLabels } from "@/lib/schedule-labels";
+import {ScheduleCard} from "@/components/schedules/schedule-card";
+import {Icon} from "@/components/ui/icon";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isStaffOrAdmin, canStartActivity } from "@/lib/auth/current-user";
@@ -17,8 +18,9 @@ export default async function SchedulesPage({ searchParams }: { searchParams: Pr
   if (error) throw new Error("일정 목록을 불러오지 못했습니다.");
   const canCreate = canStartActivity(profile) && ["member", "staff", "admin"].includes(profile.role);
 
-  return <main className="mx-auto min-h-screen max-w-5xl px-6 py-12">
-    <header className="flex flex-wrap items-center justify-between gap-4"><div><p className="font-semibold text-emerald-600">01Runners</p><h1 className="mt-2 text-3xl font-bold">일정</h1></div><div className="flex flex-wrap gap-2">{isStaffOrAdmin(profile)&&<Link href="/schedules/templates" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-3 font-bold">정기런 양식 관리</Link>}{canCreate && <Link data-maintenance-blocked={Boolean(profile.service_blocked?.scheduleCreation)} href="/schedules/new" className="rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white">일정 만들기</Link>}</div></header>
-    <nav aria-label="일정 기간" className="mt-6 flex gap-3"><Link href="/schedules" aria-current={!past?"page":undefined} className={`min-h-11 rounded-xl px-4 py-3 font-semibold ${!past?"bg-emerald-600 text-white":"bg-zinc-100 text-zinc-700"}`}>다가오는 일정</Link><Link href="/schedules?view=past" aria-current={past?"page":undefined} className={`min-h-11 rounded-xl px-4 py-3 font-semibold ${past?"bg-emerald-600 text-white":"bg-zinc-100 text-zinc-700"}`}>지난 일정</Link></nav><section className="mt-8 grid gap-4">{data?.length ? data.map((s) => <Link key={s.schedule_id} href={`/schedules/${s.schedule_id}`} className="rounded-2xl border p-6 hover:border-emerald-400"><p className="text-sm text-emerald-700">{scheduleTypeLabels[s.schedule_type]??s.schedule_type} · {s.status==="open"&&new Date(s.registration_end_at).getTime()<new Date(now).getTime()?"모집 마감":scheduleStatusLabels[s.status]??s.status}</p><h2 className="mt-2 text-xl font-bold">{s.title}</h2><p className="mt-2 text-zinc-600">{new Date(s.start_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} · {s.location}</p><p className="mt-1 text-sm text-zinc-500">신청 마감 {new Date(s.registration_end_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}{s.capacity ? ` · ${s.capacity}명` : ""}</p></Link>) : <div className="rounded-2xl bg-zinc-50 p-12 text-center">{past?"지난 일정이 없습니다.":"다가오는 일정이 없습니다."}</div>}</section>
+  return <main>
+    <header className="page-heading"><div><p className="eyebrow">2001 RUNNERS</p><h1>러닝 일정</h1><p className="page-description">정기런, 번개런, 이벤트 일정을 확인하세요.</p></div><div className="flex flex-wrap gap-2">{isStaffOrAdmin(profile)&&<Link href="/schedules/templates" className="button-secondary">정기런 양식 관리</Link>}{canCreate&&<Link data-maintenance-blocked={Boolean(profile.service_blocked?.scheduleCreation)} href="/schedules/new" className="button-primary"><Icon name="plus" size={16}/>일정 만들기</Link>}</div></header>
+    <div className="schedules-toolbar"><nav aria-label="일정 기간" className="segmented-tabs"><Link href="/schedules" aria-current={!past?"page":undefined}>다가오는 일정</Link><Link href="/schedules?view=past" aria-current={past?"page":undefined}>지난 일정</Link></nav><span className="list-count">총 {data?.length??0}개의 일정</span></div>
+    <section className="schedule-list">{data?.length?data.map(schedule=><ScheduleCard key={schedule.schedule_id} schedule={schedule} now={now}/>):<div className="empty-state"><span className="empty-icon"><Icon name="calendar" size={28}/></span><h3>{past?"아직 지난 일정이 없어요":"다음 러닝을 준비하고 있어요"}</h3><p>{past?"크루와 함께 달린 일정이 이곳에 모입니다.":"새로운 일정이 등록되면 이곳에서 확인할 수 있어요."}</p></div>}</section>
   </main>;
 }

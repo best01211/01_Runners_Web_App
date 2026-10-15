@@ -1,5 +1,7 @@
 "use client";
 
+import { Brand } from "@/components/navigation/app-shell";
+import { Icon } from "@/components/ui/icon";
 import { safeNextPath } from "@/lib/public-data";
 import Link from "next/link";
 import { FormEvent, Suspense, useState } from "react";
@@ -57,13 +59,15 @@ function LoginForm() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-md">
-        <h1 className="text-center text-2xl font-bold text-gray-900">
-          01Runners 로그인
+    <main className="login-page">
+      <aside className="login-story"><div className="login-poster-meta"><span>2001 RUNNERS</span><span>크루 전용 공간</span></div><div className="login-poster-mark"><Brand light/><h2>RUNNERS</h2></div><div className="login-poster-footer"><span>함께 뛰는 일정과 기록.</span><span>↗</span></div></aside>
+      <div className="login-form-area"><Link href="/login" className="login-mobile-brand" aria-label="01Runners"><Brand/></Link>
+      <section className="login-card"><p className="eyebrow">회원 로그인</p>
+        <h1 className="login-title">
+          크루 로그인
         </h1>
 
-        <p className="mt-2 text-center text-sm text-gray-500">
+        <p className="mt-3 text-sm leading-6 text-zinc-500">
           이메일이 아닌 회원 아이디와 비밀번호를 입력해 주세요.
         </p>
 
@@ -85,7 +89,7 @@ function LoginForm() {
               autoComplete="username"
               placeholder="아이디"
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-gray-900"
+              className="input"
             />
           </div>
 
@@ -105,7 +109,7 @@ function LoginForm() {
               autoComplete="current-password"
               placeholder="비밀번호"
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-gray-900"
+              className="input"
             />
           </div>
 
@@ -118,17 +122,17 @@ function LoginForm() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-lg bg-black px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="button-primary w-full justify-center"
           >
-            {isSubmitting ? "로그인 중..." : "로그인"}
+            {isSubmitting ? "로그인 중..." : <>로그인<Icon name="arrow" size={18}/></>}
           </button>
         </form>
         {searchParams.get("signup") === "complete" && <p className="mt-4 text-sm text-emerald-700">가입 신청이 완료되었습니다. 이메일 확인이 필요한 경우 메일의 링크를 열어주세요. 운영진 승인 후 로그인할 수 있습니다.</p>}
         {searchParams.get("confirmed") === "1" && <p className="mt-4 text-sm text-emerald-700">이메일 인증이 완료되었습니다.</p>}
         {searchParams.get("authError") && <p role="alert" className="mt-4 text-sm text-red-600">인증 링크가 만료되었거나 사용할 수 없습니다.</p>}
-        <Link href="/signup" className="mt-5 block text-center text-sm font-semibold">회원가입 신청</Link>
-        <Link href="/auth/forgot-password" className="mt-5 block text-center text-sm font-semibold text-emerald-700">비밀번호를 잊으셨나요?</Link>
-      </section>
+        <div className="login-signup"><span>아직 크루 회원이 아닌가요?</span><Link href="/signup">가입 신청<Icon name="arrow" size={14}/></Link></div>
+        <Link href="/auth/forgot-password" className="mt-5 block text-center text-sm text-zinc-500 hover:text-emerald-700">비밀번호를 잊으셨나요?</Link>
+      </section><p className="login-bottom-note">2001 RUNNERS · 회원 전용</p></div>
     </main>
   );
 }

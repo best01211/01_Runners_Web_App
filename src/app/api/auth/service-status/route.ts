@@ -11,7 +11,7 @@ export async function GET() {
   if (error || !user) return json({ destination: "/login" }, 401);
   const admin = createSupabaseAdminClient();
   const [profileResult, settingResult, withdrawalResult] = await Promise.all([
-    admin.from("profiles").select("role,is_pacer,account_status,approval_status").eq("user_id", user.id).maybeSingle(),
+    admin.from("profiles").select("role,is_pacer,account_status,approval_status,staff_position").eq("user_id", user.id).maybeSingle(),
     admin.from("system_settings").select("setting_value").eq("setting_key", "maintenance").maybeSingle(),
     admin.from("withdrawal_requests").select("request_id").eq("user_id", user.id).eq("status", "pending").maybeSingle(),
   ]);

@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";import test from "node:test";
 import {parseMaintenanceSetting,canAccessDuringService,featureBlocked,requestFeature} from "../../src/lib/service-policy";
-test("full maintenance admits staff/admin only, irrespective of pacer status",()=>{
+test("full maintenance admits administrator, president and vice president only",()=>{
  const setting=parseMaintenanceSetting({status:"maintenance"})!;
- assert.equal(canAccessDuringService(setting,{role:"admin"}),true);assert.equal(canAccessDuringService(setting,{role:"staff"}),true);
+ assert.equal(canAccessDuringService(setting,{role:"admin"}),true);assert.equal(canAccessDuringService(setting,{role:"staff"}),false);
+ assert.equal(canAccessDuringService(setting,{role:"staff",staff_position:"president"}),true);assert.equal(canAccessDuringService(setting,{role:"staff",staff_position:"vice_president"}),true);
  assert.equal(canAccessDuringService(setting,{role:"member",is_pacer:true}),false);
 });
 test("partial restrictions independently select access grades and features",()=>{
  const setting=parseMaintenanceSetting({status:"restricted",blocked:{access:true,scheduleCreation:true,comments:true,participation:true,profile:true},allowedAccess:{admin:true,staff:false,pacer:true,member:false,guest:false}})!;
  assert.equal(canAccessDuringService(setting,{role:"admin"}),true);assert.equal(canAccessDuringService(setting,{role:"staff"}),false);
+ assert.equal(canAccessDuringService(setting,{role:"staff",staff_position:"president"}),true);assert.equal(canAccessDuringService(setting,{role:"staff",staff_position:"vice_president"}),false);
  assert.equal(canAccessDuringService(setting,{role:"member",is_pacer:true}),true);assert.equal(canAccessDuringService(setting,{role:"member"}),false);
  for(const feature of ["scheduleCreation","comments","participation","profile"] as const)assert.equal(featureBlocked(setting,feature),true);
  assert.equal(requestFeature("/api/schedules","POST"),"scheduleCreation");assert.equal(requestFeature("/api/comments/id","PATCH"),"comments");

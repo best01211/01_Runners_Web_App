@@ -1,13 +1,15 @@
+import {resolveRankingSeason} from "@/lib/ranking-seasons";
+import {buildPersonalActivity} from "@/lib/personal-activity";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildRanking, DEFAULT_SCORE_POLICY, parseScorePolicy, type RankingAttendance } from "@/lib/ranking";
-export async function loadRanking(seasonId?: string | null, adminAccess = false) {
+export async function loadRanking(seasonId?: string | null, adminAccess = false, currentUserId?:string) {
  const client = createSupabaseAdminClient();
  let seasonsQuery = client.from("seasons").select("season_id,name,starts_on,ends_on,is_default,status,is_public").order("starts_on", { ascending: false });
  if (!adminAccess) seasonsQuery = seasonsQuery.eq("is_public", true).neq("status", "hidden");
  const { data: seasons, error: seasonsError } = await seasonsQuery;
  if (seasonsError) throw new Error("시즌 조회에 실패했습니다.");
- const season = seasonId ? seasons?.find(s => s.season_id === seasonId) : seasons?.find(s => s.is_default);
- if (seasonId && !season) throw new Error("조회할 수 없는 시즌입니다.");
+ const selection=resolveRankingSeason(seasons??[],seasonId);
+ const season=selection.season;
  const { data: setting, error: settingError } = await client.from("system_settings").select("setting_value").eq("setting_key", "score_policy").maybeSingle();
  if (settingError) throw new Error("점수 정책 조회에 실패했습니다.");
  const policy = setting ? parseScorePolicy(setting.setting_value) : DEFAULT_SCORE_POLICY;
@@ -32,5 +34,6 @@ export async function loadRanking(seasonId?: string | null, adminAccess = false)
    if (data.length < 500) break;
   }
  }
- return { ranking: buildRanking(rows,policy,pacers,season), season: season ?? null, seasons: seasons ?? [], policy };
+ return { ranking: buildRanking(rows,policy,pacers,season), season: season ?? null, seasons: selection.seasons, currentSeasonId:selection.currentSeasonId, policy,
+  personalActivity:currentUserId?{...buildPersonalActivity(rows,policy,pacers,currentUserId,season),seasonName:season?.name??'전체 시즌'}:null };
 }

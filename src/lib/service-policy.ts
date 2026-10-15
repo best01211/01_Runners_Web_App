@@ -1,3 +1,4 @@
+import {hasAdminAuthority} from "./auth/account-access";
 import {normalizeScheduleTime} from "./korea-time";
 export const SERVICE_FEATURES = {scheduleCreation:"일정 생성 금지",comments:"댓글 작성·수정 금지",participation:"일정 참석 신청·그룹 변경 금지",access:"접속 금지",profile:"내 정보 수정 금지"} as const;
 export type ServiceFeature = keyof typeof SERVICE_FEATURES;
@@ -23,9 +24,9 @@ export function parseMaintenanceSetting(value: unknown): MaintenanceSetting | nu
   if(startsAt===undefined||endsAt===undefined||(v.startsAt&&startsAt===null)||(v.endsAt&&endsAt===null)||(startsAt&&endsAt&&Date.parse(startsAt)>=Date.parse(endsAt)))return null;
   return {status:v.status as MaintenanceSetting["status"],message:String(v.message??""),startsAt,endsAt,blocked,allowedAccess};
 }
-export function canAccessDuringService(setting: MaintenanceSetting,profile:{role:string;is_pacer?:boolean}){
-  if(setting.status==="normal"||profile.role==="admin")return true;
-  if(setting.status==="maintenance")return profile.role==="staff";
+export function canAccessDuringService(setting: MaintenanceSetting,profile:{role:string;is_pacer?:boolean;staff_position?:string|null}){
+  if(setting.status==="normal"||hasAdminAuthority(profile))return true;
+  if(setting.status==="maintenance")return profile.role==="staff"&&profile.staff_position==="vice_president";
   if(!setting.blocked.access)return true;
   return (profile.role==="staff"&&setting.allowedAccess.staff)||Boolean(profile.is_pacer&&setting.allowedAccess.pacer)||(profile.role==="member"&&setting.allowedAccess.member)||(profile.role==="guest"&&setting.allowedAccess.guest);
 }
