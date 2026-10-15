@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildRanking, parseScorePolicy, DEFAULT_SCORE_POLICY, type RankingAttendance } from "../../src/lib/ranking";
+import { formatRankingName, selectRankingDisplay, buildRanking, parseScorePolicy, DEFAULT_SCORE_POLICY, type RankingAttendance } from "../../src/lib/ranking";
 import { canEditScheduleType } from "../../src/lib/validation/schedule-permissions";
 const row = (id: string, status="attended", at="2026-10-07T01:00:00Z"): RankingAttendance => ({user_id:id,schedule_id:"race",status,profiles:{login_id:id,nickname:null,role:"member",account_status:"active",approval_status:"approved",ranking_excluded:false,is_test_account:false},schedules:{start_at:at,status:"attendance_closed",deleted_at:null}});
 const policy={...DEFAULT_SCORE_POLICY,minimumAttendance:0};
@@ -36,4 +36,18 @@ test("invalid policies fail validation",()=>{
  for(const attended of [-1,0.5,"10",Infinity,100001]) assert.equal(parseScorePolicy({...policy,attended}),null);
  assert.equal(parseScorePolicy({...policy,includeGuests:"false"}),null);
  assert.deepEqual(parseScorePolicy(policy),policy);
+});
+
+test("ranking names use nickname and real name without exposing login id",()=>{
+ assert.equal(formatRankingName({name:"홍길동",nickname:"러너"}),"러너 < 홍길동");
+ assert.equal(formatRankingName({name:"홍길동",nickname:"  "}),"홍길동");
+});
+test("ranking shows top ten and own row only when outside top ten",()=>{
+ const rows=Array.from({length:60},(_,i)=>({userId:String(i+1)}));
+ const outside=selectRankingDisplay(rows,"42");
+ assert.equal(outside.podium.length,3);assert.equal(outside.leaders.length,7);
+ assert.equal(outside.own?.rank,42);assert.equal(outside.own?.row.userId,"42");
+ assert.equal(selectRankingDisplay(rows,"10").own,null);
+ assert.equal(selectRankingDisplay(rows,"missing").own,null);
+ assert.equal(selectRankingDisplay(rows.slice(0,2),"1").podium.length,2);
 });
