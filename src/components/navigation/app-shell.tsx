@@ -6,6 +6,7 @@ import {usePathname} from "next/navigation";
 import {useEffect,useState,type ReactNode} from "react";
 import {canAdminister} from "@/lib/auth/account-access";
 import {Icon,type IconName} from "@/components/ui/icon";
+import {NavigationProgress} from "./navigation-progress";
 
 const links:{href:string;label:string;icon:IconName}[]=[
   {href:"/dashboard",label:"크루 홈",icon:"home"},
@@ -33,11 +34,11 @@ export function AppShell({children}:{children:ReactNode}) {
     refreshIdentity();
     window.addEventListener('profile-updated',refreshIdentity);
     return()=>{controller.abort();window.removeEventListener('profile-updated',refreshIdentity)};
-  },[pathname,publicPage]);
+  },[publicPage]);
   if(publicPage)return <>{children}</>;
   const current=links.find(link=>pathname===link.href||pathname.startsWith(link.href+"/"));
   const name=identity?.nickname||identity?.name;
-  const navLink=(link:typeof links[number])=><Link key={link.href} href={link.href} aria-current={current?.href===link.href?"page":undefined} className={current?.href===link.href?"shell-link is-active":"shell-link"}><Icon name={link.icon}/><span>{link.label}</span></Link>;
+  const navLink=(link:typeof links[number])=><Link key={link.href} href={link.href} aria-current={current?.href===link.href?"page":undefined} className={current?.href===link.href?"shell-link is-active":"shell-link"}><Icon name={link.icon}/><span>{link.label}</span><NavigationProgress/></Link>;
   return <div className="app-shell">
     <header className="club-header"><div className="club-header-inner">
       <Link href="/dashboard" className="club-brand" aria-label="2001 Runners 홈"><Brand/><span>RUNNERS</span></Link>

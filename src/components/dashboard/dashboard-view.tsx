@@ -12,10 +12,10 @@ export function DashboardView({profile,schedules,now,scheduleError=false,activit
   const approval=profile.approval_status==='approved'?'승인 완료':'승인 대기';
   const canOperate=canStartActivity(profile)&&['staff','admin'].includes(profile.role);
   return <main className="dashboard-page">
-    <header className="dashboard-intro">
-      <h1>안녕하세요, {profile.nickname||profile.name}님</h1>
-      <p>다음 러닝과 나의 활동을 확인하세요.</p>
-      <div className="dashboard-account-state"><span>{role}</span><span>{approval}</span></div>
+    <header className="dashboard-intro crew-intro">
+      <div className="crew-intro-top"><span className="crew-eyebrow"><span aria-hidden="true"/>2001 RUNNERS CLUB</span><span className="crew-edition">{new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'Asia/Seoul'}).format(new Date(now))}</span></div>
+      <div className="crew-intro-content"><div><p className="crew-manifesto">WE RUN<br/><span>AS ONE.</span></p><h1>오늘도, 함께 달려요.</h1><p className="crew-greeting">{profile.nickname||profile.name}님, 다음 러닝과 나의 기록을 만나보세요.</p><Link href="/schedules" className="crew-intro-action">러닝 일정 보기<Icon name="arrow" size={18}/></Link></div><div className="crew-track" aria-hidden="true"><span>01</span><small>KEEP YOUR PACE.</small></div></div>
+      <div className="crew-intro-bottom"><span>각자의 속도로, 같은 방향으로.</span><div className="dashboard-account-state"><span>{role}</span><span>{approval}</span></div></div>
     </header>
     {profile.account_status==='restricted'&&<p className="service-notice">신규 활동이 제한된 계정입니다. 일정 조회·기존 참가 취소·출석 인증은 이용할 수 있습니다.</p>}
     <section className="dashboard-next" aria-labelledby="next-run-title">

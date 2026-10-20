@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BackNavigation } from "@/components/navigation/back-navigation";
 import "./globals.css";
+import "./polish.css";
 import { AppShell } from "@/components/navigation/app-shell";
 import { MaintenancePopup } from "@/components/service/maintenance-popup";
 import { ServiceAccessMonitor } from "@/components/service/service-access-monitor";

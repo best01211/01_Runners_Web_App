@@ -662,3 +662,9 @@ input[type=checkbox] { width: 20px; height: 20px; }
 .podium-place .ranking-identity { width:100%; }
 .podium-place.place-1 .ranking-real-name { color:#d4d9df; }
 @media(max-width:479px) { .podium-place .ranking-real-name {font-size:12px;} }
+
+/* Keep the current page visible during navigation; indicate slow transitions quietly. */
+.shell-link { position: relative; }
+.navigation-progress { position: absolute; bottom: 3px; left: 22%; right: 22%; height: 2px; border-radius: 2px; background: currentColor; animation: navigation-progress-in .2s ease-out .25s both; }
+@keyframes navigation-progress-in { from { opacity: 0; transform: scaleX(.3); } to { opacity: .6; transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .navigation-progress { animation: none; } }
