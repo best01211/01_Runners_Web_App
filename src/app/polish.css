@@ -64,6 +64,8 @@ body,.app-shell { background:var(--crew-paper); color:var(--crew-ink); }
 .segmented-tabs { gap:8px; }
 .segmented-tabs a { min-height:42px; padding:9px 16px; border:0; border-radius:100px; color:#647055; font-size:14px; }
 .segmented-tabs a[aria-current=page] { background:var(--crew-ink); color:#fff; }
+.schedules-toolbar { padding-bottom:14px; border-bottom:1px solid var(--crew-line); }
+.schedules-toolbar + nav[aria-label="러닝 유형"] { margin-top:20px; margin-bottom:20px; gap:8px; }
 .schedule-list .schedule-card { transition:background .16s; border-color:var(--crew-line); }
 .schedule-list .schedule-card:hover { background:#eeefe6; }
 .featured-event { border-color:var(--crew-line); border-radius:20px; }
