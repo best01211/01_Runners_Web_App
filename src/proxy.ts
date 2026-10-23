@@ -1,3 +1,4 @@
+import { measure, timedSupabaseFetch } from "@/lib/performance";
 import {parseMaintenanceSetting,canAccessDuringService,requestFeature,featureBlocked,SERVICE_FEATURES} from "@/lib/service-policy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createServerClient } from "@supabase/ssr";
@@ -13,11 +14,16 @@ function isPublicPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  return measure("proxy.total", () => runProxy(request));
+}
+
+async function runProxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: timedSupabaseFetch },
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll(cookiesToSet) {
@@ -42,18 +48,20 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role,account_status,approval_status,is_pacer,staff_position")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [profileResult, withdrawalResult, maintenanceResult] = await Promise.all([
+    supabase.from("profiles").select("role,account_status,approval_status,is_pacer,staff_position").eq("user_id", user.id).maybeSingle(),
+    supabase.from("withdrawal_requests").select("request_id").eq("user_id",user.id).eq("status","pending").maybeSingle(),
+    createSupabaseAdminClient().from("system_settings").select("setting_value").eq("setting_key", "maintenance").maybeSingle(),
+  ]);
+  const { data: profile } = profileResult;
+  const { data: withdrawal, error: withdrawalError } = withdrawalResult;
+  const { data: maintenance, error: maintenanceError } = maintenanceResult;
 
   if (!profile) {
     if (pathname === "/pending" || pathname.startsWith("/api/auth/")) return response;
     return NextResponse.redirect(new URL("/pending", request.url));
   }
 
-  const {data:withdrawal,error:withdrawalError}=await supabase.from("withdrawal_requests").select("request_id").eq("user_id",user.id).eq("status","pending").maybeSingle();
   if (withdrawalError && !pathname.startsWith("/api/auth/")) return NextResponse.json({success:false,error:{code:"ACCOUNT_CHECK_FAILED",message:"계정 상태를 확인하지 못했습니다."}},{status:503});
   if (["suspended", "withdrawn"].includes(profile.account_status) || withdrawal) {
     if (pathname === "/account-status" || pathname.startsWith("/api/auth/")) return response;
@@ -82,7 +90,6 @@ export async function proxy(request: NextRequest) {
   }
   if(pathname === "/account-status") return NextResponse.redirect(new URL("/dashboard",request.url));
 
-  const { data: maintenance, error: maintenanceError } = await createSupabaseAdminClient().from("system_settings").select("setting_value").eq("setting_key", "maintenance").maybeSingle();
   const setting=parseMaintenanceSetting(maintenance?.setting_value??{status:"normal"});
   if(maintenanceError||!setting)return NextResponse.json({success:false,error:{code:"SERVICE_CONFIG_ERROR",message:"서비스 설정을 확인하지 못했습니다."}},{status:503});
   const access=canAccessDuringService(setting,profile);

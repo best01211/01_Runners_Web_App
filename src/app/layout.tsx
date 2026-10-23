@@ -1,3 +1,4 @@
+import { NavigationTiming } from "@/components/navigation/navigation-timing";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BackNavigation } from "@/components/navigation/back-navigation";
@@ -38,7 +39,7 @@ export default function RootLayout({
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col"><ServiceAccessMonitor /><MaintenancePopup><AppShell><BackNavigation />{children}</AppShell></MaintenancePopup></body>
+      <body className="min-h-full flex flex-col"><NavigationTiming /><ServiceAccessMonitor /><MaintenancePopup><AppShell><BackNavigation />{children}</AppShell></MaintenancePopup></body>
     </html>
   );
 }

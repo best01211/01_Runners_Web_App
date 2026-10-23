@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { measure } from "@/lib/performance";
 import {parseMaintenanceSetting,type ServiceFeature} from "@/lib/service-policy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,30 +21,36 @@ export type CurrentProfile = {
   service_blocked?: Partial<Record<ServiceFeature,boolean>>;
 };
 
-export async function getCurrentProfile(): Promise<CurrentProfile | null> {
+export const getCurrentUser = cache(async () => {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  return measure("auth.current-user", () => supabase.auth.getUser());
+});
+
+// Request-scoped React memoization; no cross-request identity or policy cache.
+export const getCurrentProfile = cache(async (): Promise<CurrentProfile | null> => measure("auth.profile", async () => {
+  const { data: { user } } = await getCurrentUser();
   if (!user) return null;
 
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
-    .from("profiles")
-    .select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url,is_pacer")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [profileResult, withdrawalResult, serviceResult] = await Promise.all([
+    admin.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url,is_pacer").eq("user_id", user.id).maybeSingle(),
+    admin.from("withdrawal_requests").select("request_id").eq("user_id", user.id).eq("status", "pending").maybeSingle(),
+    admin.from("system_settings").select("setting_value").eq("setting_key","maintenance").maybeSingle(),
+  ]);
+  const { data, error } = profileResult;
+  const { data: withdrawal, error: withdrawalError } = withdrawalResult;
+  const { data: service, error: serviceError } = serviceResult;
 
   if (error) {
     console.error("getCurrentProfile failed:", error);
     return null;
   }
   if (!data) return null;
-  const { data: withdrawal, error: withdrawalError } = await admin.from("withdrawal_requests").select("request_id").eq("user_id", user.id).eq("status", "pending").maybeSingle();
   if (withdrawalError) return null;
-  const {data:service,error:serviceError}=await admin.from("system_settings").select("setting_value").eq("setting_key","maintenance").maybeSingle();
   const config=parseMaintenanceSetting(service?.setting_value??{status:"normal"});
   if(serviceError||!config)return null;
   return { ...data, service_blocked:config.status==="restricted"?config.blocked:{}, withdrawal_pending: Boolean(withdrawal) } as CurrentProfile;
-}
+}));
 
 export function publicName(profile: Pick<CurrentProfile, "nickname" | "login_id">) {
   return profile.nickname?.trim() || profile.login_id;

@@ -11,7 +11,7 @@ export async function GET() {
   if (error || !user) return json({ destination: "/login" }, 401);
   const admin = createSupabaseAdminClient();
   const [profileResult, settingResult, withdrawalResult] = await Promise.all([
-    admin.from("profiles").select("role,is_pacer,account_status,approval_status,staff_position").eq("user_id", user.id).maybeSingle(),
+    admin.from("profiles").select("name,nickname,role,is_pacer,account_status,approval_status,staff_position").eq("user_id", user.id).maybeSingle(),
     admin.from("system_settings").select("setting_value").eq("setting_key", "maintenance").maybeSingle(),
     admin.from("withdrawal_requests").select("request_id").eq("user_id", user.id).eq("status", "pending").maybeSingle(),
   ]);
@@ -22,5 +22,5 @@ export async function GET() {
   if (profile.approval_status !== "approved" || profile.role === "pending") return json({ destination: "/pending" });
   const setting = parseMaintenanceSetting(settingResult.data?.setting_value ?? { status: "normal" });
   if (!setting) return json({ error: "SERVICE_CONFIG_ERROR" }, 503);
-  return json({ destination: canAccessDuringService(setting, profile) ? null : "/maintenance" });
+  return json({ profile, destination: canAccessDuringService(setting, profile) ? null : "/maintenance" });
 }

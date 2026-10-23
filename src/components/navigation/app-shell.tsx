@@ -25,15 +25,9 @@ export function AppShell({children}:{children:ReactNode}) {
   const [identity,setIdentity]=useState<Identity|null>(null);
   useEffect(()=>{
     if(publicPage)return;
-    const controller=new AbortController();
-    let version=0;
-    const refreshIdentity=()=>{
-      const requestVersion=++version;
-      void fetch('/api/auth/me',{cache:'no-store',signal:controller.signal}).then(r=>r.ok?r.json():null).then(result=>{if(!controller.signal.aborted&&requestVersion===version)setIdentity(result?.data?.profile??null)}).catch(()=>{});
-    };
-    refreshIdentity();
-    window.addEventListener('profile-updated',refreshIdentity);
-    return()=>{controller.abort();window.removeEventListener('profile-updated',refreshIdentity)};
+    const receiveIdentity=(event:Event)=>setIdentity((event as CustomEvent<Identity|null>).detail);
+    window.addEventListener('service-identity',receiveIdentity);
+    return()=>{window.removeEventListener('service-identity',receiveIdentity);setIdentity(null)};
   },[publicPage]);
   if(publicPage)return <>{children}</>;
   const current=links.find(link=>pathname===link.href||pathname.startsWith(link.href+"/"));

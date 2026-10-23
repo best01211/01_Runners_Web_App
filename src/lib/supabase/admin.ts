@@ -1,3 +1,4 @@
+import { timedSupabaseFetch } from "@/lib/performance";
 import { createClient } from "@supabase/supabase-js";
 
 export function createSupabaseAdminClient() {
@@ -5,6 +6,7 @@ export function createSupabaseAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Supabase server environment variables are missing.");
   return createClient(url, key, {
+    global: { fetch: timedSupabaseFetch },
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }

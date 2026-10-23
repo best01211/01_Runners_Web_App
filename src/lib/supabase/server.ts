@@ -1,3 +1,4 @@
+import { timedSupabaseFetch } from "@/lib/performance";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -7,6 +8,7 @@ export async function createSupabaseServerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: timedSupabaseFetch },
       cookies: {
         getAll: () => cookieStore.getAll(),
         setAll(cookiesToSet) {
