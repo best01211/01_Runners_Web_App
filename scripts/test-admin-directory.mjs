@@ -5,8 +5,9 @@ const compile=(file,resolve)=>{const mod=new Module(file);mod.require=resolve;mo
 const access=compile('src/lib/auth/account-access.ts',require);
 const base={account_status:'active',approval_status:'approved',is_pacer:false,ranking_excluded:false};
 const members=[{...base,user_id:'admin-id',role:'admin',name:'관리자 비공개 계정',email:'admin@test.invalid',login_id:'administrator'},{...base,user_id:'staff-id',role:'staff',staff_position:'president',name:'회장 계정',email:'staff@test.invalid',login_id:'president'},{...base,user_id:'member-id',role:'member',name:'회원 계정',email:'member@test.invalid',login_id:'member'}];
-const client={from(table){queries.push(table);let filters=[];const q={select(){return q},order(){return q},in(){return q},is(){return q},neq(key,value){filters.push([key,value]);return q},eq(){return q},async maybeSingle(){return {data:{setting_value:{}},error:null}},then(resolve){const data=table==='profiles'?members.filter(m=>filters.every(([key,v])=>m[key]!==v)):[];return Promise.resolve({data,error:null}).then(resolve)}};return q;}};
+const client={from(table){queries.push(table);let filters=[];const q={select(){return q},range(){return q},order(){return q},in(){return q},is(){return q},neq(key,value){filters.push([key,value]);return q},eq(){return q},async maybeSingle(){return {data:{setting_value:{}},error:null}},then(resolve){const data=table==='profiles'?members.filter(m=>filters.every(([key,v])=>m[key]!==v)):[];return Promise.resolve({data,error:null}).then(resolve)}};return q;}};
 const page=compile('src/app/admin/page.tsx',id=>{
+ if(id==='@/lib/query-pagination')return compile('src/lib/query-pagination.ts',require);
  if(id==='@/lib/regular-run-templates-server')return {loadRegularTemplates:async()=>[]};
  if(id==='@/lib/auth/account-access')return access;
  if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>actor,isStaffOrAdmin:p=>access.canStartActivity(p)&&['staff','admin'].includes(p.role)};

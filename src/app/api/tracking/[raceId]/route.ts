@@ -1,3 +1,4 @@
+import {loadTrackingSnapshot} from "@/lib/tracking-snapshot-server";
 import {canAdminister} from "@/lib/auth/account-access";
 import {canUseService} from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
@@ -5,8 +6,6 @@ import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isUUID, validateRaceWrite } from "@/lib/race-tracking/validation";
-import type { RaceSnapshot } from "@/lib/race-tracking/live-types";
-import type { Checkpoint } from "@/lib/race-tracking/types";
 
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ raceId: string }> };
@@ -39,43 +38,13 @@ function databaseFailure(code: string) {
  if (["42P01","PGRST205","PGRST202"].includes(code)) return fail("SETUP_REQUIRED", "추적 전용 DB 설정이 필요합니다. 관리자에게 알려주세요.", 503);
  return fail("DATABASE_ERROR", "추적 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", 503);
 }
-export async function GET(_: Request, { params }: Context) {
- const { raceId } = await params, c = await context(raceId);
- if (c.error) return c.error;
- const { data: course, error } = await c.admin.from("tracking_races").select("name,distance_meters,points,start_at").eq("race_id", raceId).maybeSingle();
- if (error) return databaseFailure(error.code);
-
- const {data:entries,error:entryError}=await c.admin.from("tracking_race_entries").select("entry_id,user_id,bib,target_pace_seconds,status").eq("race_id",raceId).limit(501);
- if(entryError)return databaseFailure(entryError.code);
- if((entries?.length??0)>500)return fail("CAPACITY_LIMIT","대회당 최대 500명을 지원합니다.",409);
- const ids=(entries??[]).map(e=>e.user_id);
- let query=c.admin.from("profiles").select("user_id,nickname,name").eq("account_status","active").eq("approval_status","approved");
- if(c.profile.role!=="admin")query=query.neq("role","admin");
- if(!c.canManage)query=query.in("user_id",ids.length?ids:["00000000-0000-0000-0000-000000000000"]);
- const {data:profiles,error:profileError}=await query.limit(500);
- if(profileError)return databaseFailure(profileError.code);
- const eligible=new Map((profiles??[]).map(p=>[p.user_id,p]));
- const visibleEntries=(entries??[]).filter(e=>eligible.has(e.user_id));
- const checkpointMap: Record<string, Checkpoint[]> = {};
- // Each runner has a bounded checkpoint count. Paging avoids Supabase's default row cap.
- if (visibleEntries.length) {
-  for (let offset = 0; ; offset += 1000) {
-   const { data: records, error: recordError } = await c.admin.from("tracking_checkpoints").select("checkpoint_id,entry_id,name,distance_meters,passed_at,received_at,source").in("entry_id", visibleEntries.map(e => e.entry_id)).order("checkpoint_id").range(offset, offset + 999);
-   if (recordError) return databaseFailure(recordError.code);
-   for (const r of records ?? []) (checkpointMap[r.entry_id] ??= []).push({ id: r.checkpoint_id, name: r.name, distanceMeters: r.distance_meters, passedAt: r.passed_at, receivedAt: r.received_at, source: "manual" });
-   if ((records?.length ?? 0) < 1000) break;
-  }
- }
- const snapshot: RaceSnapshot = {
-  serverNow: new Date().toISOString(), title: c.schedule.name, currentUserId: c.profile.user_id, canManage: c.canManage, courseLocked: Boolean(entries?.length),
-  course: course ? { name: course.name, distanceMeters: course.distance_meters, points: course.points, startAt: course.start_at } : null,
-  participants: [...eligible.values()].filter(() => c.canManage).map(p => ({ userId: p.user_id, name: p.nickname?.trim() || p.name })),
-  entries: visibleEntries.filter(() => c.canManage).map(e => ({ entryId: e.entry_id, userId: e.user_id, bib: e.bib })),
-  runners: visibleEntries.map(e => ({ id: e.entry_id, name: eligible.get(e.user_id)!.nickname?.trim() || eligible.get(e.user_id)!.name, bib: e.bib, startAt: course!.start_at, targetPaceSeconds: e.target_pace_seconds ?? undefined, status: e.status })),
-  checkpoints: checkpointMap,
- };
- const response = ok(snapshot); response.headers.set("Cache-Control", "private, no-store"); return response;
+export async function GET(_:Request,{params}:Context){
+ const profile=await getCurrentProfile();if(!profile||!canUseService(profile))return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
+ const {raceId}=await params;if(!isUUID(raceId))return fail("NOT_FOUND","이벤트를 찾을 수 없습니다.",404);
+ try{const response=ok(await loadTrackingSnapshot(raceId,profile));response.headers.set("Cache-Control","private, no-store");return response;}
+ catch(error){const code=error instanceof Error?error.message:"DATABASE_ERROR";return fail(code,"추적 정보를 불러오지 못했습니다.",code==="FORBIDDEN"?403:code==="NOT_FOUND"?404:503);}
 }
+
 const errors: Record<string, string> = {
  RACE_FORBIDDEN: "변경 권한이 없습니다.", RACE_NOT_FOUND: "진행 가능한 이벤트가 아닙니다.",
  COURSE_LOCKED: "선수가 등록된 코스는 변경할 수 없습니다.", COURSE_REQUIRED: "먼저 코스를 등록해주세요.",

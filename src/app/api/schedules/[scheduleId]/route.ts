@@ -3,6 +3,7 @@ import { publicSchedule } from "@/lib/public-data";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {createSupabaseServerClient} from "@/lib/supabase/server";
 import { validateSchedulePayload } from "@/lib/validation/schedule";
 import { canEditScheduleType } from "@/lib/validation/schedule-permissions";
 
@@ -63,8 +64,17 @@ export async function DELETE(request: Request, { params }: Context) {if (request
   const canManage = isStaffOrAdmin(profile) || (current.schedule_type === "flash" && current.creator_id === profile.user_id);
   if (!canManage) return fail("FORBIDDEN", "취소 권한이 없습니다.", 403);
 
+  let body:Record<string,unknown>={};
+  try{body=await request.json();if(!body||typeof body!=="object"||Array.isArray(body))return fail("INVALID_JSON","요청 형식을 확인해주세요.");}catch{return fail("INVALID_JSON","요청 형식을 확인해주세요.");}
+  if(body.permanent===true){
+    if(profile.role!=="admin")return fail("FORBIDDEN","관리자만 영구 삭제할 수 있습니다.",403);
+    const client=await createSupabaseServerClient();
+    const {error}=await client.rpc("delete_cancelled_schedule",{target_schedule:scheduleId,confirmation:String(body.confirmation??"")});
+    if(error)return fail("DELETE_FAILED",error.message.includes("CANCELLED_ONLY")?"취소된 일정만 영구 삭제할 수 있습니다.":"영구 삭제하지 못했습니다. 확인 문구와 연결 기록을 확인해주세요.",409);
+    return ok({deleted:true});
+  }
   let reason = "";
-  try { reason = String((await request.json()).reason ?? "").trim(); } catch {}
+  reason = String(body.reason ?? "").trim();
   const { data, error } = await admin.from("schedules").update({
     status: "cancelled",
     cancelled_by: profile.user_id,

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import {usePathname} from "next/navigation";
-import {useEffect,useState,type ReactNode} from "react";
+import {useEffect,useRef,useState,type ReactNode} from "react";
 import {canAdminister} from "@/lib/auth/account-access";
 import {Icon,type IconName} from "@/components/ui/icon";
 import {NavigationProgress} from "./navigation-progress";
@@ -21,6 +21,8 @@ export function Brand({light=false}:{light?:boolean}) {
 }
 export function AppShell({children}:{children:ReactNode}) {
   const pathname=usePathname();
+  const staffMenu=useRef<HTMLDetailsElement>(null);
+  useEffect(()=>{staffMenu.current?.removeAttribute("open")},[pathname]);
   const publicPage=pathname==="/"||["/login","/signup","/pending","/maintenance","/account-status"].includes(pathname)||pathname.startsWith("/auth/");
   const [identity,setIdentity]=useState<Identity|null>(null);
   useEffect(()=>{
@@ -38,7 +40,7 @@ export function AppShell({children}:{children:ReactNode}) {
       <Link href="/dashboard" className="club-brand" aria-label="2001 Runners 홈"><Brand/><span>RUNNERS</span></Link>
       <nav aria-label="주 메뉴" className="desktop-nav">{links.map(navLink)}</nav>
       <div className="club-header-actions">
-        {identity&&["staff","admin"].includes(identity.role)&&<details className="staff-menu"><summary>운영<Icon name="chevron" size={13}/></summary><nav aria-label="운영 메뉴"><Link href="/staff/members/pending">가입 승인</Link><Link href="/admin">{canAdminister(identity)?"크루 관리":"회원 조회"}</Link>{identity.role==="admin"&&<Link href="/admin/operations">관리자 · 운영 설정</Link>}</nav></details>}
+        {identity&&["staff","admin"].includes(identity.role)&&<details ref={staffMenu} className="staff-menu"><summary>운영<Icon name="chevron" size={13}/></summary><nav aria-label="운영 메뉴" onClick={event=>{if((event.target as Element).closest("a"))staffMenu.current?.removeAttribute("open")}}><Link href="/staff/members/pending">가입 승인</Link><Link href="/admin">{canAdminister(identity)?"크루 관리":"회원 조회"}</Link>{identity.role==="admin"&&<Link href="/admin/operations">관리자 · 운영 설정</Link>}</nav></details>}
         <Link href="/profile" className="shell-account" aria-label="내 정보"><span className="account-avatar">{name?.slice(0,1)||<Icon name="user" size={17}/>}</span><span className="account-name">{name||"내 정보"}</span></Link>
         <form action="/api/auth/logout" method="post"><button className="logout-button" aria-label="로그아웃" title="로그아웃"><Icon name="logout" size={18}/></button></form>
       </div>

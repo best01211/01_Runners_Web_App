@@ -15,7 +15,7 @@ export async function loadRanking(seasonId?: string | null, adminAccess = false,
  if (settingError) throw new Error("점수 정책 조회에 실패했습니다.");
  const policy = setting ? parseScorePolicy(setting.setting_value) : DEFAULT_SCORE_POLICY;
  if (!policy) throw new Error("저장된 점수 정책을 확인해주세요.");
- let query = client.from("attendances").select("user_id,schedule_id,status,profiles:profiles!attendances_user_id_fkey!inner(login_id,name,nickname,role,account_status,approval_status,ranking_excluded,is_test_account),schedules:schedules!attendances_schedule_id_fkey!inner(start_at,status,deleted_at)").in("status", ["attended", "late", "absent"]).order("attendance_id");
+ let query = client.from("attendances").select("user_id,schedule_id,status,profiles:profiles!attendances_user_id_fkey!inner(login_id,name,nickname,role,account_status,approval_status,ranking_excluded,is_test_account),schedules:schedules!attendances_schedule_id_fkey!inner(start_at,status,deleted_at)").in("status", ["attended", "late", "absent"]).neq("schedules.status","cancelled").is("schedules.deleted_at",null).order("attendance_id");
  if (season) query = query.gte("schedules.start_at", `${season.starts_on}T00:00:00+09:00`).lt("schedules.start_at", new Date(Date.parse(`${season.ends_on}T00:00:00+09:00`) + 86400000).toISOString());
  // Page through attendance records so the PostgREST row limit cannot truncate scores.
  const rows: RankingAttendance[] = [];

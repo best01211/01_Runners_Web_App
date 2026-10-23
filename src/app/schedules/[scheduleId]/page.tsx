@@ -1,3 +1,5 @@
+import {DeleteCancelledSchedule} from "@/components/schedules/delete-cancelled-schedule";
+import {AdminTestParticipationPanel} from "@/components/participation/admin-test-participation";
 import {readAllPages} from "@/lib/query-pagination";
 import {loadScheduleComments} from "@/lib/schedule-comments-server";
 import Image from "next/image";
@@ -28,7 +30,7 @@ export default async function ScheduleDetailPage({params}:Props){
   const needsClose=schedule.schedule_type==="regular"&&schedule.attendance_opened_at&&!schedule.attendance_closed_at&&Date.parse(schedule.end_at)<=new Date().getTime();
   let attendanceQuery=admin.from("attendances").select("user_id,status").eq("schedule_id",scheduleId);
   if(!canManage)attendanceQuery=attendanceQuery.eq("user_id",profile.user_id);
-  const [templateResult,participantsResult,groupsResult,initialComments,attendanceRows]=await Promise.all([
+  const [templateResult,participantsResult,groupsResult,initialComments,attendanceRows,adminTestResult]=await Promise.all([
     schedule.schedule_type === "regular" && schedule.regular_template_id
       ? admin.from("regular_run_templates").select("image_url").eq("template_id",schedule.regular_template_id).maybeSingle()
       : Promise.resolve({data:null,error:null}),
@@ -36,8 +38,9 @@ export default async function ScheduleDetailPage({params}:Props){
     admin.from("pace_groups").select("pace_group_id,pace_seconds,distance_km,group_kind").eq("schedule_id",scheduleId).order("pace_seconds"),
     schedule.comment_enabled ? loadScheduleComments(scheduleId).catch(()=>undefined) : Promise.resolve(undefined),
     needsClose ? Promise.resolve(undefined) : readAllPages((from,to)=>attendanceQuery.order("attendance_id").range(from,to)).catch(()=>undefined),
+    profile.role==="admin"?admin.from("admin_schedule_tests").select("pace_group_id,event_role,attendance_status").eq("schedule_id",scheduleId).eq("user_id",profile.user_id).maybeSingle():Promise.resolve({data:null,error:null}),
   ]);
-  if(templateResult.error||groupsResult.error)throw new Error("일정 참가 정보를 불러오지 못했습니다.");
+  if(templateResult.error||groupsResult.error||adminTestResult.error)throw new Error("일정 참가 정보를 불러오지 못했습니다.");
   const imageUrl=templateResult.data?.image_url??null;
   const participants=participantsResult;
   const participation=participants.find(row=>row.user_id===profile.user_id)??null;
@@ -61,8 +64,9 @@ export default async function ScheduleDetailPage({params}:Props){
       <dl className="mt-8 grid gap-5 rounded-2xl bg-zinc-50 p-6 sm:grid-cols-2"><div><dt className="text-sm text-zinc-500">일정 시간</dt><dd className="mt-1 font-semibold">{new Date(schedule.start_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</dd></div><div><dt className="text-sm text-zinc-500">장소</dt><dd className="mt-1 font-semibold">{schedule.location}</dd></div><div><dt className="text-sm text-zinc-500">신청 마감</dt><dd className="mt-1 font-semibold">{new Date(schedule.registration_end_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</dd></div><div><dt className="text-sm text-zinc-500">정원</dt><dd className="mt-1 font-semibold">{schedule.capacity?`${schedule.capacity}명`:"제한 없음"}</dd></div></dl>
       {imageUrl && <Image unoptimized src={imageUrl} alt="정기런 안내 사진" width={1200} height={675} className="mt-8 max-h-[32rem] w-full rounded-2xl object-contain" />}
       <div className="mt-8 whitespace-pre-wrap leading-7 text-zinc-700">{schedule.description||"상세 설명이 없습니다."}</div>
-      {schedule.status==="cancelled"?<div className="mt-8 rounded-2xl bg-red-50 p-5 text-red-800">취소된 일정입니다.{schedule.cancellation_reason?` 사유: ${schedule.cancellation_reason}`:""}</div>:schedule.schedule_type==="event"?<EventParticipationPanel scheduleId={scheduleId} canParticipate={canParticipate&&(profile.role!=="guest"||schedule.guest_allowed)} canManage={isStaffOrAdmin(profile)} maintenanceBlocked={Boolean(profile.service_blocked?.participation)}/>:<ParticipationPanel key={`${participation?.participation_id??"none"}:${participation?.pace_group_id??"none"}:${participation?.status??"none"}`} initialGroupCounts={groupCounts} isStaff={isStaffOrAdmin(profile)} maintenanceBlocked={Boolean(profile.service_blocked?.participation)} canChangeGroup={canStartActivity(profile)} scheduleId={scheduleId} scheduleType={schedule.schedule_type} scheduleStatus={schedule.status} participantCount={participantCount??0} capacity={schedule.capacity} capacityExempt={profile.role==="staff"&&!schedule.staff_in_capacity} registrationStartAt={schedule.registration_start_at} registrationEndAt={schedule.registration_end_at} cancellationDeadlineAt={schedule.cancellation_deadline_at} participation={participation} canParticipate={canParticipate} paceGroups={paceGroups??[]} canCreatePaceGroup={isStaffOrAdmin(profile)||(canStartActivity(profile)&&schedule.schedule_type==="flash"&&(canManage||Boolean(participation)))}/>}
+      {schedule.status==="cancelled"?<div className="mt-8 rounded-2xl bg-red-50 p-5 text-red-800">취소된 일정입니다.{schedule.cancellation_reason?` 사유: ${schedule.cancellation_reason}`:""}</div>:profile.role==="admin"?<AdminTestParticipationPanel scheduleId={scheduleId} scheduleType={schedule.schedule_type} eventKind={schedule.event_kind} groups={paceGroups} initial={adminTestResult.data} blocked={Boolean(profile.service_blocked?.participation)}/>:schedule.schedule_type==="event"?<EventParticipationPanel scheduleId={scheduleId} canParticipate={canParticipate&&(profile.role!=="guest"||schedule.guest_allowed)} canManage={isStaffOrAdmin(profile)} maintenanceBlocked={Boolean(profile.service_blocked?.participation)}/>:<ParticipationPanel key={`${participation?.participation_id??"none"}:${participation?.pace_group_id??"none"}:${participation?.status??"none"}`} initialGroupCounts={groupCounts} isStaff={isStaffOrAdmin(profile)} maintenanceBlocked={Boolean(profile.service_blocked?.participation)} canChangeGroup={canStartActivity(profile)} scheduleId={scheduleId} scheduleType={schedule.schedule_type} scheduleStatus={schedule.status} participantCount={participantCount??0} capacity={schedule.capacity} capacityExempt={profile.role==="staff"&&!schedule.staff_in_capacity} registrationStartAt={schedule.registration_start_at} registrationEndAt={schedule.registration_end_at} cancellationDeadlineAt={schedule.cancellation_deadline_at} participation={participation} canParticipate={canParticipate} paceGroups={paceGroups??[]} canCreatePaceGroup={isStaffOrAdmin(profile)||(canStartActivity(profile)&&schedule.schedule_type==="flash"&&(canManage||Boolean(participation)))}/>}
       
+      {schedule.status==="cancelled"&&profile.role==="admin"&&<DeleteCancelledSchedule scheduleId={scheduleId}/>}
       <AttendancePanel initialData={initialAttendance} scheduleId={scheduleId} canManage={canManage} eventMode={schedule.schedule_type==="event"} paceGroups={schedule.schedule_type==="event"?[]:paceGroups??[]}/>
       {schedule.comment_enabled&&<CommentPanel initialComments={initialComments} scheduleId={scheduleId} currentUserId={profile.user_id} maintenanceBlocked={Boolean(profile.service_blocked?.comments)} canWrite={canStartActivity(profile)} canNotice={isStaffOrAdmin(profile)}/>}
     </section>

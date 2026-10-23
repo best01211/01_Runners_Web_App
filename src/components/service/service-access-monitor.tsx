@@ -1,5 +1,6 @@
 "use client";
 
+import {requestFeature} from "@/lib/service-policy";
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
@@ -21,7 +22,9 @@ export function ServiceAccessMonitor() {
       try {
         const response = await fetch("/api/auth/service-status", { cache: "no-store", signal: controller.signal });
         if (!response.ok && response.status !== 401) return;
-        const { destination, profile } = await response.json();
+        const { destination, profile, blockedFeatures } = await response.json();
+        const feature=requestFeature(currentPath.current,"GET");
+        if(!disposed&&feature&&blockedFeatures?.[feature]){window.location.replace("/maintenance");return;}
         if (!disposed) window.dispatchEvent(new CustomEvent("service-identity", { detail: profile ?? null }));
         const allowed = ["/maintenance", "/account-status", "/pending", "/login"];
         if (!disposed && allowed.includes(destination) && destination !== currentPath.current) window.location.replace(destination);

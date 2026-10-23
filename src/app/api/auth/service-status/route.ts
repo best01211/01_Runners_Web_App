@@ -22,5 +22,5 @@ export async function GET() {
   if (profile.approval_status !== "approved" || profile.role === "pending") return json({ destination: "/pending" });
   const setting = parseMaintenanceSetting(settingResult.data?.setting_value ?? { status: "normal" });
   if (!setting) return json({ error: "SERVICE_CONFIG_ERROR" }, 503);
-  return json({ profile, destination: canAccessDuringService(setting, profile) ? null : "/maintenance" });
+  return json({ profile, blockedFeatures:setting.status==="restricted"?setting.blocked:{}, destination: canAccessDuringService(setting, profile) ? null : "/maintenance" });
 }

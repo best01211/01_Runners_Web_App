@@ -20,7 +20,7 @@ export async function loadScheduleHistoryOrMonth(now:string,month?:string):Promi
  const rows:ScheduleSummary[]=[];const range=month?monthRange(month):null;
  for(let offset=0;;offset+=500){
   let query=createSupabaseAdminClient().from('schedules').select(scheduleFields).is('deleted_at',null);
-  query=range?query.gte('start_at',range.start).lt('start_at',range.end):query.or(`end_at.lt.${now},status.eq.completed`);
+  query=range?query.gte('start_at',range.start).lt('start_at',range.end):query.or(`end_at.lt.${now},status.eq.completed,status.eq.cancelled`);
   const {data,error}=await query.order('start_at',{ascending:Boolean(month)}).order('schedule_id').range(offset,offset+499);
   if(error)throw new Error('일정 목록을 불러오지 못했습니다.');rows.push(...data as unknown as ScheduleSummary[]);if(data.length<500)break;
  }return rows;

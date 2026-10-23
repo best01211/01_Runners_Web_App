@@ -1,3 +1,5 @@
+import {Suspense} from "react";
+import {readAllPages} from "@/lib/query-pagination";
 import {canAdminister} from "@/lib/auth/account-access";
 import {MemberDelete} from "@/components/admin/member-delete";
 import Link from "next/link";
@@ -21,11 +23,15 @@ export default async function AdminPage({searchParams}:{searchParams:Promise<{ta
  let members=null,seasons=null,setting=null,withdrawals=null;
  const templates=tab==='templates'?await loadRegularTemplates():[];
  if(tab==='members'){
-  let query=client.from('profiles').select('user_id,name,nickname,role,staff_position,account_status').order('created_at',{ascending:false});
+  let query=client.from('profiles').select('user_id,login_id,name,nickname,role,staff_position,account_status,ranking_excluded,is_pacer').order('created_at',{ascending:false}).order('user_id');
   if(!isAdmin)query=query.neq('role','admin');
-  const result=await query;if(result.error)throw new Error('회원 목록을 불러오지 못했습니다.');members=result.data;
-  if(canEdit){const result2=await client.from('withdrawal_requests').select('*,profiles:user_id(name,role)').in('status',['pending','approved']).is('auth_deleted_at',null);
-  withdrawals=(result2.data??[]).filter(w=>isAdmin||(Array.isArray(w.profiles)?w.profiles[0]?.role:w.profiles?.role)!=='admin');}
+  const [rows,withdrawalResult]=await Promise.all([
+   readAllPages((from,to)=>query.range(from,to)),
+   canEdit?client.from('withdrawal_requests').select('*,profiles:user_id(name,role)').in('status',['pending','approved']).is('auth_deleted_at',null):Promise.resolve({data:[],error:null}),
+  ]);
+  members=rows;
+  if(withdrawalResult.error)throw new Error('탈퇴 신청을 불러오지 못했습니다.');
+  withdrawals=(withdrawalResult.data??[]).filter(w=>isAdmin||(Array.isArray(w.profiles)?w.profiles[0]?.role:w.profiles?.role)!=='admin');
  }
  if(tab==='seasons'){const result=await client.from('seasons').select('*').order('starts_on',{ascending:false});if(result.error)throw new Error('시즌을 불러오지 못했습니다.');seasons=result.data;}
  if(tab==='scores'){const result=await client.from('system_settings').select('setting_value').eq('setting_key','score_policy').maybeSingle();if(result.error)throw new Error('설정을 불러오지 못했습니다.');setting=result.data?.setting_value??{};}
@@ -33,7 +39,7 @@ export default async function AdminPage({searchParams}:{searchParams:Promise<{ta
  <nav className="management-tabs" aria-label="크루 관리 메뉴">{tabs.map(([key,label])=><Link key={key} href={`/admin?tab=${key}`} aria-current={tab===key?'page':undefined}>{label}</Link>)}</nav>
  <section className="mt-6"><h2 className="mb-4 text-xl font-bold">{heading}</h2>
  {tab==='members'&&<>{Boolean(withdrawals?.length)&&<section className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4"><h3 className="font-bold">탈퇴 승인</h3>{withdrawals?.map(w=><div key={w.request_id} className="mt-4 flex flex-wrap items-center justify-between gap-3"><span>{Array.isArray(w.profiles)?w.profiles[0]?.name:w.profiles?.name}</span><WithdrawalActions requestId={w.request_id} retry={w.status==='approved'}/></div>)}</section>}
- {isAdmin&&<FailedDeletions/>}
+ {isAdmin&&<Suspense fallback={null}><FailedDeletions/></Suspense>}
  <MemberDirectory members={members??[]} canEdit={canEdit} isAdmin={isAdmin} selfId={profile.user_id}/></>}
  {tab==='seasons'&&<SeasonManager seasons={seasons??[]}/>}
  {tab==='templates'&&<><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-zinc-600">정기런 양식을 추가·수정·삭제합니다. 날짜와 시간은 일정을 만들 때 입력합니다.</p></div><p className="mt-2 text-xs text-zinc-500">양식 정보 수정은 새 일정의 기본값에 적용됩니다. 사진 교체는 해당 양식을 사용하는 기존 일정에도 반영됩니다.</p><RegularTemplateManager templates={templates}/></>}

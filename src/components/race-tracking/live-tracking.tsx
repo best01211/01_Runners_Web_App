@@ -11,11 +11,11 @@ import type { Coordinate } from "@/lib/race-tracking/types";
 const inputClass = "mt-1 w-full rounded-xl border border-zinc-300 bg-white p-3 text-base";
 const buttonClass = "min-h-12 w-full sm:w-auto rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white disabled:opacity-40";
 
-export function LiveTracking({ scheduleId, title, apiPath }: { scheduleId: string; title: string; apiPath?: string }) {
+export function LiveTracking({ scheduleId, title, apiPath, initialData }: { scheduleId: string; title: string; initialData?:RaceSnapshot; apiPath?: string }) {
  const endpoint = apiPath ?? `/api/schedules/${scheduleId}/tracking`;
- const [data, setData] = useState<RaceSnapshot | null>(null);
+ const [data, setData] = useState<RaceSnapshot | null>(initialData??null);
  const [error, setError] = useState("");
- const [now, setNow] = useState(0);
+ const [now, setNow] = useState(initialData?Date.parse(initialData.serverNow):0);
  const [selection, setSelection] = useState("");
  const [refreshing, setRefreshing] = useState(false);
  const anchor = useRef<{ now: number; at: number; healthy: boolean } | null>(null);
@@ -46,13 +46,14 @@ export function LiveTracking({ scheduleId, title, apiPath }: { scheduleId: strin
   }
  }, [endpoint]);
  useEffect(() => {
-  mounted.current = true; void load();
+  mounted.current = true;
+  if(initialData)anchor.current={now:Date.parse(initialData.serverNow),at:performance.now(),healthy:true};else void load();
   const poll = setInterval(() => { if (document.visibilityState === "visible") void load(); }, 15000);
   const tick = setInterval(() => { const a = anchor.current; if (a?.healthy) setNow(a.now + Math.min(30000, performance.now() - a.at)); }, 1000);
   const visible = () => { if (document.visibilityState === "visible") void load(); };
   document.addEventListener("visibilitychange", visible);
   return () => { mounted.current = false; activeRequest.current?.abort(); activeRequest.current = null; clearInterval(poll); clearInterval(tick); document.removeEventListener("visibilitychange", visible); };
- }, [load]);
+ }, [load,initialData]);
  const courseData = data?.course;
  const course = useMemo(() => courseData ? buildCourse(courseData.points, courseData.distanceMeters) : null, [courseData]);
  const states = useMemo(() => course && data ? data.runners.map(runner => trackRunner(runner, data.checkpoints[runner.id] ?? [], course, now)) : [], [course, data, now]);

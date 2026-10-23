@@ -11,6 +11,7 @@
     "test:auth": "node scripts/test-auth.mjs",
     "test:release": "node scripts/test-release.mjs",
     "test:dashboard-streaming": "node scripts/test-dashboard-streaming.mjs",
+    "test:schedule-admin-db": "node scripts/test-schedule-admin-controls-database.mjs",
     "test:regular-support-db": "node scripts/test-regular-support-database.mjs",
     "test:release-db": "node scripts/test-release-database.mjs",
     "test:stabilization-db": "node scripts/test-stabilization-database.mjs",

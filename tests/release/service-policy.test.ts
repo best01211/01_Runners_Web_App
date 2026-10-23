@@ -21,3 +21,14 @@ test("settings reject malformed switches, dates and administrator lockout",()=>{
  assert.equal(parseMaintenanceSetting({status:"normal",startsAt:"2026-10-14T12:00"})?.startsAt,"2026-10-14T03:00:00.000Z");
  assert.equal(parseMaintenanceSetting({status:"restricted"})?.blocked.access,true);
 });
+
+test('live tracking restrictions cover pages, APIs and schedule tracking without blocking unrelated pages',()=>{
+ const setting=parseMaintenanceSetting({status:'restricted',blocked:{liveTracking:true}})!;
+ assert.equal(featureBlocked(setting,'liveTracking'),true);
+ for(const route of ['/tracking','/tracking/demo','/tracking/new','/tracking/abc','/api/tracking','/api/tracking/abc','/schedules/abc/tracking','/api/schedules/abc/tracking']){
+  assert.equal(requestFeature(route,'GET'),'liveTracking');assert.equal(requestFeature(route,'POST'),'liveTracking');
+ }
+ for(const route of ['/dashboard','/profile','/schedules','/api/schedules/abc/attendance','/tracking-other'])assert.notEqual(requestFeature(route,'GET'),'liveTracking');
+ assert.equal(featureBlocked(parseMaintenanceSetting({status:'normal',blocked:{liveTracking:true}})!,'liveTracking'),false);
+ assert.equal(parseMaintenanceSetting({status:'restricted',blocked:{}})?.blocked.liveTracking,false);
+});

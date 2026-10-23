@@ -5,7 +5,7 @@ import {parseMaintenanceSetting,SERVICE_FEATURES,type ServiceFeature} from "@/li
 import {koreaDateTimeInput} from "@/lib/korea-time";
 export function ServiceSettings({initial}:{initial:Record<string,unknown>}){
  const [featureTab,setFeatureTab]=useState("schedule");
- const featureGroups=[{key:"schedule",label:"일정",features:["scheduleCreation","comments","participation"]},{key:"access",label:"접속",features:["access"]},{key:"profile",label:"내 정보",features:["profile"]}];
+ const featureGroups=[{key:"schedule",label:"일정",features:["scheduleCreation","comments","participation"]},{key:"tracking",label:"라이브 추적",features:["liveTracking"]},{key:"access",label:"접속",features:["access"]},{key:"profile",label:"내 정보",features:["profile"]}];
  const router=useRouter();const config=parseMaintenanceSetting(initial)??parseMaintenanceSetting({status:"normal"})!;
  const [status,setStatus]=useState(config.status),[blocked,setBlocked]=useState(config.blocked),[allowed,setAllowed]=useState(config.allowedAccess),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
  async function save(event:FormEvent<HTMLFormElement>){event.preventDefault();if(busy)return;const values=new FormData(event.currentTarget);setBusy(true);setMessage("");try{
