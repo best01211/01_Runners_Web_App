@@ -677,3 +677,17 @@ input[type=checkbox] { width: 20px; height: 20px; }
 /* Keep preloaded GPX vectors visible while panning beyond Leaflet's SVG viewport.
    The outer map container still clips the map to its card. */
 .tracking-map .leaflet-overlay-pane > svg { overflow: visible; }
+
+/* The operation menu and account mode are independent controls. */
+.header-mode-control { flex-shrink: 0; }
+.staff-menu nav { top: calc(100% + 12px); }
+.club-header-actions { flex-shrink: 0; }
+.staff-menu summary { white-space: nowrap; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; }
+.staff-menu summary:hover, .staff-menu[open] summary { background: #eeeee7; }
+.staff-menu summary:focus-visible { outline: 2px solid #52525b; outline-offset: 3px; }
+@media(max-width:639px) {
+  .club-header-inner { flex-wrap: wrap; }
+  .header-mode-control { order: 3; display: flex; flex-basis: 100%; justify-content: flex-end; }
+  .club-header-inner:has(.header-mode-control) .staff-menu nav { top: calc(100% + 76px); }
+  .club-header-actions { margin-left: auto; }
+}
