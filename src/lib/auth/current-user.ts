@@ -2,7 +2,7 @@ import {headers} from "next/headers";
 import {PAGE_CONTEXT_HEADER,decodePageContext} from "./page-context";
 import { cache } from "react";
 import { measure } from "@/lib/performance";
-import {parseMaintenanceSetting,type ServiceFeature} from "@/lib/service-policy";
+import {parseMaintenanceSetting,serviceFeatureBlocks,type ServiceFeature} from "@/lib/service-policy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canStartActivity } from "./account-access";
@@ -51,7 +51,7 @@ export const getCurrentProfile = cache(async (): Promise<CurrentProfile | null> 
   if (withdrawalError) return null;
   const config=parseMaintenanceSetting(service?.setting_value??{status:"normal"});
   if(serviceError||!config)return null;
-  return { ...data, service_blocked:config.status==="restricted"?config.blocked:{}, withdrawal_pending: Boolean(withdrawal) } as CurrentProfile;
+  return { ...data, service_blocked:serviceFeatureBlocks(config,{...data,withdrawal_pending:Boolean(withdrawal)}), withdrawal_pending: Boolean(withdrawal) } as CurrentProfile;
 }));
 
 // Page rendering only. API handlers deliberately continue using getCurrentProfile.

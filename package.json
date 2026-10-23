@@ -14,6 +14,7 @@
     "test:upcoming-query-db": "node scripts/test-upcoming-query-database.mjs",
     "test:page-context": "node scripts/test-page-context.mjs",
     "test:dashboard-streaming": "node scripts/test-dashboard-streaming.mjs",
+    "test:admin-maintenance-db": "node scripts/test-admin-maintenance-database.mjs",
     "test:schedule-admin-db": "node scripts/test-schedule-admin-controls-database.mjs",
     "test:regular-support-db": "node scripts/test-regular-support-database.mjs",
     "test:release-db": "node scripts/test-release-database.mjs",

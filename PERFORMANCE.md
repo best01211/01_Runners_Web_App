@@ -137,3 +137,13 @@ profiles.user_id 및 system_settings.setting_key 키와 withdrawals_one_pending 
 - 신규 주요 파일: src/lib/auth/page-context.ts, src/lib/auth/current-user.ts, src/proxy.ts, src/lib/schedule-overview-server.ts, 서버 page.tsx의 접근자 import, 테스트 스크립트 3개와 SQL 026.
 - 이번 수정은 빈 본문의 대기 원인을 줄이는 작업이며 기존 디자인/레이아웃/로딩 표시를 바꾸지 않았다.
 - 실제 원격 DB 적용·Vercel 배포·로그인 브라우저 재측정은 하지 못했다. 운영 환경의 본문 표시 시간, 리전 왕복 시간, 헤더 전달과 세션 갱신 동작을 배포 후 확인해야 한다. 운영에서 헤더 전달이 누락돼도 기존 인증 검증으로 돌아가므로 검증을 생략하지 않는다.
+
+
+# 관리자 점검 예외
+- 활성·승인된 admin 계정만 일부 기능 제한을 우회한다. 회장/부회장/일반 운영진/회원의 기존 정책은 유지한다. 전체 점검의 기존 관리자 접속 허용도 유지한다.
+- 프록시의 featureBlocked, 페이지에 전달되는 service_blocked, 상태 확인 API의 blockedFeatures에 동일한 관리자 예외를 적용했다. 관리자 화면의 입력/버튼과 라이브 추적도 제한되지 않는다.
+- SQL 027에서 service_feature_blocked를 같은 규칙으로 수정해 DB RPC/트리거의 일정 생성·참가·댓글·프로필·라이브 추적 제한과 화면이 일치하게 했다. RLS 정책 및 소유권/계정/일정 상태 검증은 변경하지 않았다.
+- restricted/suspended/withdrawn, 미승인, 탈퇴 대기 관리자에는 예외를 적용하지 않는다. 참가 마감·취소 기한·출석 잠금 같은 기능 고유 검증도 유지한다.
+- 변경 파일: src/lib/service-policy.ts, src/proxy.ts, src/lib/auth/current-user.ts, src/app/api/auth/service-status/route.ts, src/components/admin/service-settings.tsx, supabase/migrations/027_admin_maintenance_access.sql 및 관련 테스트/명령.
+- 검증: 릴리스 테스트 55개, 관리자 점검 DB 검사 54개(기존 일정 관리 검사 포함), 페이지 컨텍스트 보안/차단 테스트, ESLint와 TypeScript 통과.
+- 배포 전에 027_admin_maintenance_access.sql 적용이 필요하다. 이 작업에서는 원격 DB 적용이나 Vercel 배포를 수행하지 않았다.

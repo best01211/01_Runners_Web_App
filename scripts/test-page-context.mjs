@@ -68,6 +68,11 @@ try{
  profile={...profile,account_status:"suspended"};const blocked=await run();assert.equal(new URL(blocked.headers.get("location")).pathname,"/account-status");assert.equal(activeHeaders.has(context.PAGE_CONTEXT_HEADER),false);
  profile={...profile,account_status:"active"};withdrawal={request_id:"pending"};const pending=await run();assert.equal(new URL(pending.headers.get("location")).pathname,"/account-status");withdrawal=null;
  config={status:"restricted",blocked:{access:true},allowedAccess:{member:false}};const maintenance=await run();assert.equal(new URL(maintenance.headers.get("location")).pathname,"/maintenance");config={status:"normal"};
+ profile={...profile,role:"admin"};config={status:"restricted",blocked:{liveTracking:true,participation:true,profile:true,scheduleCreation:true,comments:true}};
+ await run("/tracking");assert.deepEqual((await auth.getCurrentPageProfile()).service_blocked,{});
+ assert.deepEqual((await (await statusRoute.GET()).json()).blockedFeatures,{});
+ profile={...profile,role:"member"};const featureDenied=await run("/tracking");assert.equal(new URL(featureDenied.headers.get("location")).pathname,"/maintenance");
+ config={status:"normal"};
  delay=20;const median=values=>values.sort((a,b)=>a-b)[Math.floor(values.length/2)];
  const before=[],after=[];
  for(let i=0;i<5;i++){

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";import test from "node:test";
-import {parseMaintenanceSetting,canAccessDuringService,featureBlocked,requestFeature} from "../../src/lib/service-policy";
+import {parseMaintenanceSetting,canAccessDuringService,featureBlocked,requestFeature,serviceFeatureBlocks} from "../../src/lib/service-policy";
 test("full maintenance admits administrator, president and vice president only",()=>{
  const setting=parseMaintenanceSetting({status:"maintenance"})!;
  assert.equal(canAccessDuringService(setting,{role:"admin"}),true);assert.equal(canAccessDuringService(setting,{role:"staff"}),false);
@@ -31,4 +31,15 @@ test('live tracking restrictions cover pages, APIs and schedule tracking without
  for(const route of ['/dashboard','/profile','/schedules','/api/schedules/abc/attendance','/tracking-other'])assert.notEqual(requestFeature(route,'GET'),'liveTracking');
  assert.equal(featureBlocked(parseMaintenanceSetting({status:'normal',blocked:{liveTracking:true}})!,'liveTracking'),false);
  assert.equal(parseMaintenanceSetting({status:'restricted',blocked:{}})?.blocked.liveTracking,false);
+});
+
+test('only active approved administrators bypass feature maintenance',()=>{
+ const setting=parseMaintenanceSetting({status:'restricted',blocked:{scheduleCreation:true,participation:true,comments:true,profile:true,liveTracking:true}})!;
+ const admin={role:'admin',account_status:'active',approval_status:'approved'};
+ for(const feature of ['scheduleCreation','participation','comments','profile','liveTracking'] as const){
+  assert.equal(featureBlocked(setting,feature,admin),false);
+  for(const role of ['member','staff','guest'])assert.equal(featureBlocked(setting,feature,{...admin,role}),true);
+ }
+ assert.deepEqual(serviceFeatureBlocks(setting,admin),{});
+ for(const patch of [{account_status:'restricted'},{account_status:'suspended'},{account_status:'withdrawn'},{approval_status:'pending'},{withdrawal_pending:true}])assert.equal(featureBlocked(setting,'liveTracking',{...admin,...patch}),true);
 });

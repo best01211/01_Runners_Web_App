@@ -1,7 +1,7 @@
 import {PAGE_CONTEXT_HEADER,encodePageContext,canPassPageContext} from "@/lib/auth/page-context";
 import type {CurrentProfile} from "@/lib/auth/current-user";
 import { measure, timedSupabaseFetch } from "@/lib/performance";
-import {parseMaintenanceSetting,canAccessDuringService,requestFeature,featureBlocked,SERVICE_FEATURES} from "@/lib/service-policy";
+import {parseMaintenanceSetting,serviceFeatureBlocks,canAccessDuringService,requestFeature,featureBlocked,SERVICE_FEATURES} from "@/lib/service-policy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
@@ -105,7 +105,7 @@ async function runProxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/maintenance",request.url));
   }
   const feature=requestFeature(pathname,request.method);
-  if(feature&&featureBlocked(setting,feature)){
+  if(feature&&featureBlocked(setting,feature,profile)){
     if(pathname.startsWith("/api/"))return NextResponse.json({success:false,error:{code:"SERVICE_FEATURE_BLOCKED",message:`관리자 설정으로 ${SERVICE_FEATURES[feature]} 상태입니다.`}},{status:403});
     return NextResponse.redirect(new URL("/maintenance",request.url));
   }
@@ -116,7 +116,7 @@ async function runProxy(request: NextRequest) {
   }
 
   if(canPassPageContext(pathname,request.method)){
-    const verifiedProfile={...profile,withdrawal_pending:false,service_blocked:setting.status==="restricted"?setting.blocked:{}} as CurrentProfile;
+    const verifiedProfile={...profile,withdrawal_pending:false,service_blocked:serviceFeatureBlocks(setting,profile)} as CurrentProfile;
     const token=encodePageContext(verifiedProfile,request.headers.get("cookie")??"",pathname);
     if(token){
       const forwarded=new Headers(request.headers);forwarded.set(PAGE_CONTEXT_HEADER,token);

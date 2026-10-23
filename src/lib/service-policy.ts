@@ -1,4 +1,4 @@
-import {hasAdminAuthority} from "./auth/account-access";
+import {canStartActivity,hasAdminAuthority} from "./auth/account-access";
 import {normalizeScheduleTime} from "./korea-time";
 export const SERVICE_FEATURES = {scheduleCreation:"일정 생성 금지",comments:"댓글 작성·수정 금지",participation:"일정 참석 신청·그룹 변경 금지",access:"접속 금지",profile:"내 정보 수정 금지",liveTracking:"라이브 추적 차단"} as const;
 export type ServiceFeature = keyof typeof SERVICE_FEATURES;
@@ -38,4 +38,9 @@ export function requestFeature(path:string,method:string):ServiceFeature|null{
   if(["/api/profile","/api/profile/password"].includes(path)&&method==="PATCH")return "profile";
   return null;
 }
-export function featureBlocked(setting:MaintenanceSetting,feature:ServiceFeature){return setting.status==="restricted"&&setting.blocked[feature];}
+type ServiceActor={role:string;account_status:string;approval_status:string;withdrawal_pending?:boolean};
+export function canBypassServiceRestrictions(profile:ServiceActor|null|undefined){return profile?.role==="admin"&&canStartActivity(profile);}
+export function serviceFeatureBlocks(setting:MaintenanceSetting,profile:ServiceActor):Partial<Record<ServiceFeature,boolean>>{
+ return setting.status==="restricted"&&!canBypassServiceRestrictions(profile)?setting.blocked:{};
+}
+export function featureBlocked(setting:MaintenanceSetting,feature:ServiceFeature,profile?:ServiceActor){return setting.status==="restricted"&&setting.blocked[feature]&&!canBypassServiceRestrictions(profile);}
