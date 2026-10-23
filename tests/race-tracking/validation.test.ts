@@ -40,3 +40,19 @@ test("groups and course parents validate IDs and integer pace bounds",()=>{
  assert.equal(entry.action,"entry");if(entry.action==="entry")assert.equal(entry.groupId,id);
  assert.throws(()=>validateRaceWrite({action:"entry",userId:id,bib:"001",targetPaceSeconds:null,groupId:"fake"}));
 });
+
+import {validateRegistration,MAX_GPX_FILE_BYTES,MAX_REGISTRATION_BYTES} from "../../src/lib/race-tracking/registration";
+test("multi-course registration preserves independent GPX, official distance and start",()=>{
+ const full={...course,courseName:"풀코스"};
+ const ten={...course,courseName:"10K",distanceMeters:10000,startAt:"2026-10-11T09:00:00+09:00",points:[{latitude:36,longitude:128},{latitude:36.1,longitude:128.1}]};
+ const r=validateRegistration({name:" 춘천 ",location:" 춘천시 ",courses:[full,ten]});
+ assert.equal(r.name,"춘천");assert.equal(r.courses.length,2);assert.equal(r.courses[0].distanceMeters,42195);assert.equal(r.courses[1].distanceMeters,10000);
+ assert.notEqual(r.courses[0].startAt,r.courses[1].startAt);assert.notDeepEqual(r.courses[0].points,r.courses[1].points);
+ assert.equal(MAX_GPX_FILE_BYTES,10000000);assert.ok(MAX_REGISTRATION_BYTES<4500000);
+});
+test("multi-course registration rejects duplicates, missing GPX and invalid parent",()=>{
+ const c={...course,courseName:"10K"};
+ for(const courses of [[],Array(21).fill(c),[c,{...c,courseName:" 10K "}],[{...c,points:[]}],[{...c,courseName:undefined}]])assert.throws(()=>validateRegistration({name:"대회",location:"",courses}));
+ assert.throws(()=>validateRegistration({name:"대회",location:"",parentRaceId:"fake",courses:[c]}));
+ const r=validateRegistration({name:"대회",location:"",parentRaceId:id,courses:[c]});assert.equal(r.parentRaceId,id);
+});
