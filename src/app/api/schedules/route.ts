@@ -32,7 +32,7 @@ export async function POST(request: Request) {if (request.headers.get("origin") 
   if ("error" in parsed) return fail("VALIDATION_ERROR", parsed.error!, 400);
 
   const groupPayload = body.paceGroups === undefined ? null : parsePaceGroups(body.paceGroups);
-  if (body.paceGroups !== undefined && !groupPayload) return fail("INVALID_PACE_GROUPS", "페이스 그룹은 중복 없이 30초·5km 단위로 입력해주세요.", 400);
+  if (body.paceGroups !== undefined && !groupPayload) return fail("INVALID_PACE_GROUPS", "페이스 그룹은 중복 없이 30초 페이스·5km 이상 1km 거리 단위로 입력해주세요.", 400);
   if (parsed.value!.schedule_type === "regular" && groupPayload && !groupPayload.length) return fail("PACE_GROUP_REQUIRED", "정기런에는 페이스 그룹을 한 개 이상 추가해주세요.", 400);
   if(parsed.value!.schedule_type==="event"&&groupPayload?.length)return fail("INVALID_PACE_GROUPS","이벤트에는 페이스 그룹을 등록하지 않습니다.",400);
   const canCreate = isStaffOrAdmin(profile) || (profile.role === "member" && parsed.value!.schedule_type === "flash");

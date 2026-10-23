@@ -1,3 +1,4 @@
+import {readAllPages} from "@/lib/query-pagination";
 import { canUseService } from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin, type CurrentProfile } from "@/lib/auth/current-user";
@@ -9,6 +10,8 @@ type Context = { params: Promise<{ scheduleId: string }> };
 
 function mapError(message: string): [string,string,number] {
   const m: Record<string,[string,string,number]> = {
+    STORAGE_STAFF_ONLY:["STORAGE_STAFF_ONLY","짐보관은 운영진만 신청할 수 있습니다.",403],
+    SUPPORT_REGULAR_ONLY:["SUPPORT_REGULAR_ONLY","지원 항목은 정기런에서만 신청할 수 있습니다.",400],
     INVALID_PACE_GROUP:["INVALID_PACE_GROUP","해당 일정의 페이스 그룹을 선택해주세요.",400],
     PACE_GROUP_SCHEDULE_MISMATCH:["PACE_GROUP_SCHEDULE_MISMATCH","DB의 페이스 그룹 연결 검증에서 참가가 거절됐습니다. 운영진에게 확인을 요청해주세요.",409],
     PACE_GROUP_REQUIRED:["PACE_GROUP_REQUIRED","정기런은 페이스 그룹 선택이 필요합니다.",400],
@@ -41,15 +44,16 @@ export async function GET(_request: Request,{params}:Context){
   if (!profile || !canUseService(profile)) return fail("UNAUTHORIZED","로그인이 필요합니다.",401);
   const {scheduleId}=await params;
   const supabase=await createSupabaseServerClient();
-  const {data,error}=await supabase.from("schedule_participations")
-    .select("participation_id,schedule_id,user_id,status,registered_at,cancelled_at,cancellation_reason,participation_locked,pace_change_locked,pace_group_id")
-    .eq("schedule_id",scheduleId).eq("user_id",profile.user_id)
-    .in("status",["registered","completed"]).maybeSingle();
-  if(error) return fail("DATABASE_ERROR","내 참가 정보를 불러오지 못했습니다.",500);
-  const {data:groups,error:groupError}=await createSupabaseAdminClient().from("schedule_participations").select("pace_group_id").eq("schedule_id",scheduleId).in("status",["registered","completed"]).limit(5001);
-  if(groupError||(groups?.length??0)>5000)return fail("DATABASE_ERROR","그룹별 인원을 불러오지 못했습니다.",500);
-  const groupCounts:Record<string,number>={};for(const row of groups??[]){const key=row.pace_group_id??'none';groupCounts[key]=(groupCounts[key]??0)+1;}
+  try {
+  const [ownResult,groups]=await Promise.all([
+    supabase.from("schedule_participations").select("participation_id,schedule_id,user_id,status,registered_at,cancelled_at,cancellation_reason,participation_locked,pace_change_locked,pace_group_id").eq("schedule_id",scheduleId).eq("user_id",profile.user_id).in("status",["registered","completed"]).maybeSingle(),
+    readAllPages((from,to)=>createSupabaseAdminClient().from("schedule_participations").select("pace_group_id").eq("schedule_id",scheduleId).in("status",["registered","completed"]).order("participation_id").range(from,to)),
+  ]);
+  if(ownResult.error)throw new Error();
+  const data=ownResult.data;
+  const groupCounts:Record<string,number>={};for(const row of groups){const key=row.pace_group_id??'none';groupCounts[key]=(groupCounts[key]??0)+1;}
   return ok({participation:data,groupCounts});
+  } catch { return fail("DATABASE_ERROR","참가 정보를 불러오지 못했습니다.",500); }
 }
 
 export async function POST(request: Request,{params}:Context){if (request.headers.get("origin") !== new URL(request.url).origin) return fail("FORBIDDEN","허용되지 않은 요청입니다.",403);

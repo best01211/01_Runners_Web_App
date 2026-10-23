@@ -28,7 +28,7 @@ export function parsePaceGroups(groups: unknown): TemplatePaceGroup[] | null {
   for (const group of groups) {
     if (!group || typeof group !== "object" || typeof group.paceSeconds !== "number" || typeof group.distanceKm !== "number") return null;
     const { paceSeconds, distanceKm } = group;
-    if (!Number.isInteger(paceSeconds) || paceSeconds <= 0 || paceSeconds > 2147483647 || paceSeconds % 30 || !Number.isInteger(distanceKm) || distanceKm < 5 || distanceKm > 2147483647 || distanceKm % 5) return null;
+    if (!Number.isInteger(paceSeconds) || paceSeconds <= 0 || paceSeconds > 2147483647 || paceSeconds % 30 || !Number.isInteger(distanceKm) || distanceKm < 5 || distanceKm > 2147483647) return null;
     const key = `${paceSeconds}:${distanceKm}`;
     if (seen.has(key)) return null;
     seen.add(key); paceGroups.push({ paceSeconds, distanceKm });

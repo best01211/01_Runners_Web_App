@@ -18,5 +18,10 @@ test("only regular schedules retain valid template references", () => {
 test("template pace groups reject duplicates, malformed values and off-step pace/distance", () => {
   const base={name:"정기런",location:"잠실"};
   assert.deepEqual(parseRegularTemplate({...base,paceGroups:[{paceSeconds:330,distanceKm:10}]})?.pace_groups,[{paceSeconds:330,distanceKm:10}]);
-  for(const paceGroups of ["bad",[null],[{paceSeconds:"330",distanceKm:10}],[{paceSeconds:331,distanceKm:10}],[{paceSeconds:330,distanceKm:7}],[{paceSeconds:330,distanceKm:10},{paceSeconds:330,distanceKm:10}],Array(21).fill({paceSeconds:330,distanceKm:10})]) assert.equal(parseRegularTemplate({...base,paceGroups}),null);
+  for(const paceGroups of ["bad",[null],[{paceSeconds:"330",distanceKm:10}],[{paceSeconds:331,distanceKm:10}],[{paceSeconds:330,distanceKm:6.5}],[{paceSeconds:330,distanceKm:10},{paceSeconds:330,distanceKm:10}],Array(21).fill({paceSeconds:330,distanceKm:10})]) assert.equal(parseRegularTemplate({...base,paceGroups}),null);
 });
+
+ test("6km and other integer distances above the minimum are accepted",()=>{
+  for(const distanceKm of [5,6,7,11])assert.deepEqual(parseRegularTemplate({name:"정기런",location:"잠실",paceGroups:[{paceSeconds:330,distanceKm}]})?.pace_groups,[{paceSeconds:330,distanceKm}]);
+  for(const distanceKm of [0,4,5.5,NaN,Infinity])assert.equal(parseRegularTemplate({name:"정기런",location:"잠실",paceGroups:[{paceSeconds:330,distanceKm}]}),null);
+ });
