@@ -1,3 +1,4 @@
+import {withProfileModeColumns} from "@/lib/auth/profile-schema";
 import {headers} from "next/headers";
 import {PAGE_CONTEXT_HEADER,decodePageContext} from "./page-context";
 import { cache } from "react";
@@ -37,7 +38,7 @@ export const getCurrentProfile = cache(async (): Promise<CurrentProfile | null> 
 
   const admin = createSupabaseAdminClient();
   const [profileResult, withdrawalResult, serviceResult] = await Promise.all([
-    admin.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url,is_pacer,admin_account,admin_mode_normal").eq("user_id", user.id).maybeSingle(),
+    withProfileModeColumns(async includeModes=>includeModes?await admin.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url,is_pacer,admin_account,admin_mode_normal").eq("user_id", user.id).maybeSingle():await admin.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url,is_pacer").eq("user_id", user.id).maybeSingle()),
     admin.from("withdrawal_requests").select("request_id").eq("user_id", user.id).eq("status", "pending").maybeSingle(),
     admin.from("system_settings").select("setting_value").eq("setting_key","maintenance").maybeSingle(),
   ]);

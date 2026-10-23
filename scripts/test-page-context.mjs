@@ -12,9 +12,10 @@ process.env.NEXT_PUBLIC_SUPABASE_URL="https://test.invalid";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY="local-anon";
 let activeHeaders=new Headers(),calls=0,delay=0,refresh=false;
 let profile={user_id:"alice",login_id:"alice",name:"Alice",nickname:null,role:"member",account_status:"active",approval_status:"approved",staff_position:null,profile_image_url:null,is_pacer:false};
+let missingModeColumns=false,profileFailure=null,profileMissing=false;
 let withdrawal=null,config={status:"normal"};
 const pause=()=>new Promise(resolve=>setTimeout(resolve,delay));
-const client={auth:{getUser:async()=>{calls++;await pause();return {data:{user:{id:profile.user_id}}};}},from(table){const query={select(){return query;},eq(){return query;},async maybeSingle(){calls++;await pause();return {data:table==="profiles"?{...profile}:table==="withdrawal_requests"?withdrawal:{setting_value:config},error:null};}};return query;}};
+const client={auth:{getUser:async()=>{calls++;await pause();return {data:{user:{id:profile.user_id}}};}},from(table){let fields="";const query={select(value){fields=value;return query;},eq(){return query;},async maybeSingle(){calls++;await pause();if(table==="profiles"&&(profileFailure||(missingModeColumns&&fields.includes("admin_account"))))return {data:null,error:profileFailure??{code:"42703",message:"column profiles.admin_account does not exist"}};return {data:table==="profiles"?(profileMissing?null:{...profile}):table==="withdrawal_requests"?withdrawal:{setting_value:config},error:null};}};return query;}};
 const cache=new Map();
 function compile(file){
  file=path.resolve(file);if(cache.has(file))return cache.get(file);
@@ -73,6 +74,15 @@ try{
  assert.deepEqual((await (await statusRoute.GET()).json()).blockedFeatures,{});
  profile={...profile,role:"member"};const featureDenied=await run("/tracking");assert.equal(new URL(featureDenied.headers.get("location")).pathname,"/maintenance");
  config={status:"normal"};
+ profileMissing=true;for(const path of ['/dashboard','/pending','/login']){const missing=await run(path);assert.equal(missing.status,503);assert.equal(missing.headers.has('location'),false);}profileMissing=false;
+ missingModeColumns=true;calls=0;const legacy=await run();assert.equal(legacy.status,200);assert.equal(calls,5);assert.equal((await auth.getCurrentPageProfile()).user_id,"alice");
+ assert.equal((await auth.getCurrentProfile()).user_id,"alice");assert.equal((await statusRoute.GET()).status,200);
+ profile={...profile,account_status:"suspended"};const legacyBlocked=await run();assert.equal(new URL(legacyBlocked.headers.get("location")).pathname,"/account-status");profile={...profile,account_status:"active"};
+ missingModeColumns=false;
+ const schema=compile('src/lib/auth/profile-schema.ts');
+ for(const error of [{code:'42501',message:'permission denied admin_account'},{code:'42703',message:'column profiles.account_status does not exist'},{code:'FETCH_ERROR',message:'admin_account network error'}]){let reads=0;const result=await schema.withProfileModeColumns(async()=>{reads++;return {data:null,error};});assert.equal(reads,1);assert.equal(result.error,error);}
+ let reads=0;await schema.withProfileModeColumns(async includeModes=>{reads++;return {data:null,error:includeModes?{code:'PGRST204',message:'admin_mode_normal missing from schema cache'}:null};});assert.equal(reads,2);
+ profileFailure={code:"42501",message:"permission denied"};calls=0;const denied=await run();assert.equal(denied.status,503);assert.equal(denied.headers.has("location"),false);assert.equal(calls,4);profileFailure=null;
  delay=20;const median=values=>values.sort((a,b)=>a-b)[Math.floor(values.length/2)];
  const before=[],after=[];
  for(let i=0;i<5;i++){

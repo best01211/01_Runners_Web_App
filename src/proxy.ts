@@ -1,3 +1,4 @@
+import {withProfileModeColumns} from "@/lib/auth/profile-schema";
 import {PAGE_CONTEXT_HEADER,encodePageContext,canPassPageContext} from "@/lib/auth/page-context";
 import type {CurrentProfile} from "@/lib/auth/current-user";
 import { measure, timedSupabaseFetch } from "@/lib/performance";
@@ -56,7 +57,7 @@ async function runProxy(request: NextRequest) {
   }
 
   const [profileResult, withdrawalResult, maintenanceResult] = await Promise.all([
-    supabase.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,is_pacer,staff_position,profile_image_url,admin_account,admin_mode_normal").eq("user_id", user.id).maybeSingle(),
+    withProfileModeColumns(async includeModes=>includeModes?await supabase.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,is_pacer,staff_position,profile_image_url,admin_account,admin_mode_normal").eq("user_id", user.id).maybeSingle():await supabase.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,is_pacer,staff_position,profile_image_url").eq("user_id", user.id).maybeSingle()),
     supabase.from("withdrawal_requests").select("request_id").eq("user_id",user.id).eq("status","pending").maybeSingle(),
     createSupabaseAdminClient().from("system_settings").select("setting_value").eq("setting_key", "maintenance").maybeSingle(),
   ]);
@@ -64,9 +65,10 @@ async function runProxy(request: NextRequest) {
   const { data: withdrawal, error: withdrawalError } = withdrawalResult;
   const { data: maintenance, error: maintenanceError } = maintenanceResult;
 
+  if (profileResult.error) return NextResponse.json({success:false,error:{code:"PROFILE_CHECK_FAILED",message:"회원 정보 조회에 실패했습니다. 잠시 후 다시 시도해주세요."}},{status:503});
   if (!profile) {
-    if (pathname === "/pending" || pathname.startsWith("/api/auth/")) return response;
-    return NextResponse.redirect(new URL("/pending", request.url));
+    if (pathname.startsWith("/api/auth/")) return response;
+    return NextResponse.json({success:false,error:{code:"PROFILE_NOT_FOUND",message:"로그인 계정의 회원 정보를 찾을 수 없습니다. 운영진에게 문의해주세요."}},{status:503});
   }
 
   if (withdrawalError && !pathname.startsWith("/api/auth/")) return NextResponse.json({success:false,error:{code:"ACCOUNT_CHECK_FAILED",message:"계정 상태를 확인하지 못했습니다."}},{status:503});

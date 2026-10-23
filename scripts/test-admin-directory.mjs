@@ -1,11 +1,11 @@
 // Verify the real server page never sends administrator accounts or edit controls to staff.
 import fs from 'node:fs';import Module from 'node:module';import ts from 'typescript';import assert from 'node:assert/strict';import {createRequire} from 'node:module';
-const require=createRequire(import.meta.url);let actor,queries=[];
+const require=createRequire(import.meta.url);let actor,queries=[],legacySchema=false;
 const compile=(file,resolve)=>{const mod=new Module(file);mod.require=resolve;mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,esModuleInterop:true,target:ts.ScriptTarget.ES2020}}).outputText,file);return mod.exports;};
 const access=compile('src/lib/auth/account-access.ts',require);
 const base={account_status:'active',approval_status:'approved',is_pacer:false,ranking_excluded:false};
 const members=[{...base,user_id:'admin-id',role:'admin',name:'관리자 비공개 계정',email:'admin@test.invalid',login_id:'administrator'},{...base,user_id:'staff-id',role:'staff',staff_position:'president',name:'회장 계정',email:'staff@test.invalid',login_id:'president'},{...base,user_id:'member-id',role:'member',name:'회원 계정',email:'member@test.invalid',login_id:'member'}];
-const client={from(table){queries.push(table);let filters=[];const q={select(){return q},range(){return q},order(){return q},in(){return q},is(){return q},neq(key,value){filters.push([key,value]);return q},eq(){return q},async maybeSingle(){return {data:{setting_value:{}},error:null}},then(resolve){const data=table==='profiles'?members.filter(m=>filters.every(([key,v])=>m[key]!==v)):[];return Promise.resolve({data,error:null}).then(resolve)}};return q;}};
+const client={from(table){queries.push(table);let filters=[],fields="";const q={select(value){fields=value;return q},range(){return q},order(){return q},in(){return q},is(){return q},neq(key,value){filters.push([key,value]);return q},eq(){return q},async maybeSingle(){return {data:{setting_value:{}},error:null}},then(resolve){if(table==='profiles'&&legacySchema&&fields.includes('admin_account'))return Promise.resolve({data:null,error:{code:'42703',message:'column profiles.admin_account does not exist'}}).then(resolve);const data=table==='profiles'?members.filter(m=>filters.every(([key,v])=>m[key]!==v)):[];return Promise.resolve({data,error:null}).then(resolve)}};return q;}};
 const page=compile('src/app/admin/page.tsx',id=>{
  if(id==='@/lib/query-pagination')return compile('src/lib/query-pagination.ts',require);
  if(id==='@/lib/regular-run-templates-server')return {loadRegularTemplates:async()=>[]};
@@ -15,6 +15,7 @@ const page=compile('src/app/admin/page.tsx',id=>{
  if(id==='next/navigation')return {redirect:path=>{throw new Error('redirect:'+path)}};
  if(id==='next/link')return function Link(){return null};
  if(id.startsWith('@/components/')){const names=['RegularTemplateManager','MemberDirectory','MemberDelete','MemberActions','WithdrawalActions','SeasonManager','SeasonSettings','OperationsSettings','ServiceSettings'];return Object.fromEntries(names.map(name=>{const fn=()=>null;Object.defineProperty(fn,'name',{value:name});return [name,fn]}));}
+ if(id==='@/lib/auth/profile-schema')return compile('src/lib/auth/profile-schema.ts',require);
  return require(id);
 }).default;
 function inspect(node,result={texts:[],components:[],links:[],directories:[]}){if(node==null||typeof node==='boolean')return result;if(typeof node==='string'||typeof node==='number'){result.texts.push(String(node));return result;}if(Array.isArray(node)){node.forEach(n=>inspect(n,result));return result;}if(typeof node==='object'){if(typeof node.type==='function')result.components.push(node.type.name);if(node.type?.name==='MemberDirectory')result.directories.push(node.props);if(node.props?.href)result.links.push(node.props.href);inspect(node.props?.children,result);}return result;}
@@ -37,6 +38,7 @@ const settings=compile('src/app/api/admin/settings/route.ts',id=>{
  if(id==='@/lib/ranking')return compile('src/lib/ranking.ts',require);
  if(id==='@/lib/service-policy')return compile('src/lib/service-policy.ts',dep=>dep==='./auth/account-access'?access:dep==='./korea-time'?compile('src/lib/korea-time.ts',require):require(dep));
  if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from(){return {upsert:()=>({select:()=>({single:async()=>({data:{},error:null})})})}}})};
+ if(id==='@/lib/auth/profile-schema')return compile('src/lib/auth/profile-schema.ts',require);
  return require(id);
 });
 const put=(key,value)=>settings.PUT(new Request('http://localhost/api/admin/settings',{method:'PUT',headers:{origin:'http://localhost','Content-Type':'application/json'},body:JSON.stringify({key,value})}));
@@ -53,6 +55,7 @@ const operations=compile('src/app/admin/operations/page.tsx',id=>{
  if(id==='next/navigation')return {redirect:path=>{throw new Error('redirect:'+path)}};
  if(id==='next/link')return function Link(){return null};
  if(id==='@/components/admin/service-settings')return {ServiceSettings:()=>null};
+ if(id==='@/lib/auth/profile-schema')return compile('src/lib/auth/profile-schema.ts',require);
  return require(id);
 }).default;
 actor={...base,role:'staff',staff_position:'president'};await assert.rejects(()=>operations(),/redirect/);
@@ -70,3 +73,5 @@ const templatePage=inspect(await page({searchParams:Promise.resolve({tab:'templa
 assert(templatePage.components.includes('RegularTemplateManager'));assert(!templatePage.components.includes('SeasonManager'));assert(templatePage.links.includes('/admin?tab=templates'));
 assert(!seasonPage.links.includes('/schedules/templates'));assert(!seasonPage.components.includes('RegularTemplateManager'));
 console.log('정기런 양식: 별도 탭 분리 / 기존 운영진 접근 권한 유지 검증 통과');
+
+legacySchema=true;actor={...base,user_id:'staff-id',role:'staff',staff_position:'staff'};const legacyOut=inspect(await page({searchParams:Promise.resolve({tab:'members'})}));assert(legacyOut.directories[0].members.some(m=>m.role==='member'));assert(!legacyOut.directories[0].members.some(m=>m.role==='admin'));console.log('031 미적용 회원 목록 호환과 관리자 숨김 검증 통과');

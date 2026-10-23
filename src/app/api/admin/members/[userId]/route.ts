@@ -1,16 +1,20 @@
+import {withProfileModeColumns} from "@/lib/auth/profile-schema";
 import { fail, ok } from "@/lib/api-response";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {getCurrentProfile,isStaffOrAdmin} from '@/lib/auth/current-user';
 import {createSupabaseAdminClient} from '@/lib/supabase/admin';
-import {memberFields,uuidPattern} from '@/lib/member-directory';
+import {memberFields,legacyMemberFields,uuidPattern} from '@/lib/member-directory';
 import {memberAttendance} from '@/lib/member-attendance';
 type Context = { params: Promise<{ userId: string }> };
 export async function GET(request:Request,{params}:Context){
  const actor=await getCurrentProfile();if(!actor||!isStaffOrAdmin(actor))return fail('FORBIDDEN','회원 조회 권한이 없습니다.',403);
  const {userId}=await params;if(!uuidPattern.test(userId))return fail('INVALID_ID','회원을 확인해주세요.');
- let query=createSupabaseAdminClient().from('profiles').select(memberFields).eq('user_id',userId);
+ const loadMember=async(includeModes:boolean)=>{
+ const client=createSupabaseAdminClient();
+ let query=includeModes?client.from('profiles').select(memberFields).eq('user_id',userId):client.from('profiles').select(legacyMemberFields).eq('user_id',userId);
  if(actor.role!=='admin')query=query.neq('role','admin');
- const {data:member,error}=await query.maybeSingle();
+ return query.maybeSingle();};
+ const {data:member,error}=await withProfileModeColumns(loadMember);
  if(error)return fail('LOAD_FAILED','회원 정보를 불러오지 못했습니다.',500);
  if(!member)return fail('NOT_FOUND','조회할 수 없는 회원입니다.',404);
  if(new URL(request.url).searchParams.get('view')==='settings')return ok({member});

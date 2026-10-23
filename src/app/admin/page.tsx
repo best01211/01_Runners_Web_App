@@ -1,3 +1,4 @@
+import {withProfileModeColumns} from "@/lib/auth/profile-schema";
 import {Suspense} from "react";
 import {readAllPages} from "@/lib/query-pagination";
 import {canAdminister} from "@/lib/auth/account-access";
@@ -23,10 +24,12 @@ export default async function AdminPage({searchParams}:{searchParams:Promise<{ta
  let members=null,seasons=null,setting=null,withdrawals=null;
  const templates=tab==='templates'?await loadRegularTemplates():[];
  if(tab==='members'){
-  let query=client.from('profiles').select('user_id,login_id,name,nickname,role,admin_account,admin_mode_normal,staff_position,account_status,ranking_excluded,is_pacer').order('created_at',{ascending:false}).order('user_id');
+  const memberPage=async(from:number,to:number)=>withProfileModeColumns(async includeModes=>{
+  let query=includeModes?client.from('profiles').select('user_id,login_id,name,nickname,role,admin_account,admin_mode_normal,staff_position,account_status,ranking_excluded,is_pacer').order('created_at',{ascending:false}).order('user_id'):client.from('profiles').select('user_id,login_id,name,nickname,role,staff_position,account_status,ranking_excluded,is_pacer').order('created_at',{ascending:false}).order('user_id');
   if(!isAdmin)query=query.neq('role','admin');
+  return query.range(from,to);});
   const [rows,withdrawalResult]=await Promise.all([
-   readAllPages((from,to)=>query.range(from,to)),
+   readAllPages(memberPage),
    canEdit?client.from('withdrawal_requests').select('*,profiles:user_id(name,role)').in('status',['pending','approved']).is('auth_deleted_at',null):Promise.resolve({data:[],error:null}),
   ]);
   members=rows;

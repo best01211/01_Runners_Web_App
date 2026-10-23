@@ -1,3 +1,4 @@
+export const legacyMemberFields = 'user_id,login_id,name,nickname,email,phone,birth_date,role,staff_position,account_status,approval_status,ranking_excluded,is_pacer,is_test_account,anonymized_at,created_at';
 export const memberFields = 'user_id,login_id,name,nickname,email,phone,birth_date,role,admin_account,admin_mode_normal,staff_position,account_status,approval_status,ranking_excluded,is_pacer,is_test_account,anonymized_at,created_at';
 export const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const attendanceLabels: Record<string,string> = {attended:'출석',late:'지각',absent:'불참',not_checked:'미확인'};

@@ -1,8 +1,9 @@
+import {withProfileModeColumns} from "@/lib/auth/profile-schema";
 import Link from 'next/link';
 import {notFound,redirect} from 'next/navigation';
 import {getCurrentPageProfile as getCurrentProfile,isStaffOrAdmin} from '@/lib/auth/current-user';
 import {createSupabaseAdminClient} from '@/lib/supabase/admin';
-import {memberFields,memberRole,uuidPattern} from '@/lib/member-directory';
+import {memberFields,legacyMemberFields,memberRole,uuidPattern} from '@/lib/member-directory';
 import {memberAttendance} from '@/lib/member-attendance';
 import {MemberDetailView,type MemberDetail} from '@/components/admin/member-detail';
 import {canAdminister} from '@/lib/auth/account-access';
@@ -12,9 +13,12 @@ export default async function MemberDetailPage({params}:{params:Promise<{userId:
  const actor=await getCurrentProfile();
  if(!actor||!isStaffOrAdmin(actor))redirect('/dashboard');
  const {userId}=await params;if(!uuidPattern.test(userId))notFound();
- let query=createSupabaseAdminClient().from('profiles').select(memberFields).eq('user_id',userId);
+ const loadMember=async(includeModes:boolean)=>{
+ const client=createSupabaseAdminClient();
+ let query=includeModes?client.from('profiles').select(memberFields).eq('user_id',userId):client.from('profiles').select(legacyMemberFields).eq('user_id',userId);
  if(actor.role!=='admin')query=query.neq('role','admin');
- const {data,error}=await query.maybeSingle();
+ return query.maybeSingle();};
+ const {data,error}=await withProfileModeColumns(loadMember);
  if(error)throw new Error('회원 정보를 불러오지 못했습니다.');
  if(!data)notFound();
  const member=data as unknown as MemberDetail;

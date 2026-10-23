@@ -12,6 +12,6 @@
 
 ## 적용과 검증
 
-배포 전에 `supabase/migrations/031_administrator_modes.sql`을 적용해야 한다. SQL 적용 전에는 새 프로필 컬럼 조회가 실패할 수 있으므로 DB를 먼저 적용한다. 이 작업은 로컬 코드·테스트만 수행하며 원격 DB에는 적용하지 않는다.
+배포 전에 `supabase/migrations/031_administrator_modes.sql`을 적용해야 한다. 031 미적용 시 프로필 조회는 기존 컬럼으로만 재시도하며 모드 전환 버튼을 숨긴다. 일반적인 프로필 조회 오류는 503으로 처리해 로그인·승인 대기 화면의 반복 이동을 막는다. 모드 전환을 사용하려면 DB를 먼저 적용한다. 이 작업은 로컬 코드·테스트만 수행하며 원격 DB에는 적용하지 않는다.
 
 `npm run test:administrator-modes`는 실제 API 핸들러의 권한/입력/위조 대상 방지와 PostgreSQL에서 권한 강등·복귀·점검·계정 제한·계정 보호·실제 참가 기록 유지·기존 RLS 정의 불변을 확인한다. DB 테스트는 기존 `.test-output/sql-qa`의 PGlite 런타임을 사용한다. Vercel 배포 후 관리자/일반 모드로 참가, 출석, 점검 중 복귀를 별도 확인한다.
