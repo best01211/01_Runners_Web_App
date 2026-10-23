@@ -4,9 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import {usePathname} from "next/navigation";
 import {useEffect,useRef,useState,type ReactNode} from "react";
-import {canAdminister} from "@/lib/auth/account-access";
+import {canAdminister,canSwitchAdministratorMode} from "@/lib/auth/account-access";
 import {Icon,type IconName} from "@/components/ui/icon";
 import {NavigationProgress} from "./navigation-progress";
+import {AdministratorModeSwitch} from "./administrator-mode-switch";
 
 const links:{href:string;label:string;icon:IconName}[]=[
   {href:"/dashboard",label:"크루 홈",icon:"home"},
@@ -15,7 +16,7 @@ const links:{href:string;label:string;icon:IconName}[]=[
   {href:"/tracking",label:"라이브 추적",icon:"route"},
   {href:"/profile",label:"내 정보",icon:"user"},
 ];
-type Identity={nickname:string|null;name:string;role:string;staff_position?:string|null;account_status:string;approval_status:string};
+type Identity={nickname:string|null;name:string;role:string;staff_position?:string|null;account_status:string;approval_status:string;admin_account?:boolean;admin_mode_normal?:boolean;withdrawal_pending?:boolean};
 export function Brand({light=false}:{light?:boolean}) {
   return <span className={`brand ${light?"brand-light":""}`}><span className="brand-logo"><Image unoptimized priority src="/branding/01runners-logo.png" alt="2001 Runners — WE RUN AS ONE" width={1447} height={1447} className="brand-logo-image"/></span></span>;
 }
@@ -40,7 +41,7 @@ export function AppShell({children}:{children:ReactNode}) {
       <Link href="/dashboard" className="club-brand" aria-label="2001 Runners 홈"><Brand/><span>RUNNERS</span></Link>
       <nav aria-label="주 메뉴" className="desktop-nav">{links.map(navLink)}</nav>
       <div className="club-header-actions">
-        {identity&&["staff","admin"].includes(identity.role)&&<details ref={staffMenu} className="staff-menu"><summary>운영<Icon name="chevron" size={13}/></summary><nav aria-label="운영 메뉴" onClick={event=>{if((event.target as Element).closest("a"))staffMenu.current?.removeAttribute("open")}}><Link href="/staff/members/pending">가입 승인</Link><Link href="/admin">{canAdminister(identity)?"크루 관리":"회원 조회"}</Link>{identity.role==="admin"&&<Link href="/admin/operations">관리자 · 운영 설정</Link>}</nav></details>}
+        {identity&&["staff","admin"].includes(identity.role)&&<details ref={staffMenu} className="staff-menu"><summary>운영<Icon name="chevron" size={13}/></summary><nav aria-label="운영 메뉴" onClick={event=>{if((event.target as Element).closest("a"))staffMenu.current?.removeAttribute("open")}}><Link href="/staff/members/pending">가입 승인</Link><Link href="/admin">{canAdminister(identity)?"크루 관리":"회원 조회"}</Link>{identity.role==="admin"&&<Link href="/admin/operations">관리자 · 운영 설정</Link>}{canSwitchAdministratorMode(identity)&&<div className="px-3 py-2"><AdministratorModeSwitch profile={identity}/></div>}</nav></details>}
         <Link href="/profile" className="shell-account" aria-label="내 정보"><span className="account-avatar">{name?.slice(0,1)||<Icon name="user" size={17}/>}</span><span className="account-name">{name||"내 정보"}</span></Link>
         <form action="/api/auth/logout" method="post"><button className="logout-button" aria-label="로그아웃" title="로그아웃"><Icon name="logout" size={18}/></button></form>
       </div>

@@ -17,6 +17,8 @@ export type CurrentProfile = {
   account_status: "active" | "restricted" | "suspended" | "withdrawn";
   approval_status: "pending" | "approved" | "rejected" | "cancelled";
   staff_position: "staff" | "vice_president" | "president" | null;
+  admin_account?:boolean;
+  admin_mode_normal?:boolean;
   profile_image_url: string | null;
   withdrawal_pending?: boolean;
   is_pacer?: boolean;
@@ -35,7 +37,7 @@ export const getCurrentProfile = cache(async (): Promise<CurrentProfile | null> 
 
   const admin = createSupabaseAdminClient();
   const [profileResult, withdrawalResult, serviceResult] = await Promise.all([
-    admin.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url,is_pacer").eq("user_id", user.id).maybeSingle(),
+    admin.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,staff_position,profile_image_url,is_pacer,admin_account,admin_mode_normal").eq("user_id", user.id).maybeSingle(),
     admin.from("withdrawal_requests").select("request_id").eq("user_id", user.id).eq("status", "pending").maybeSingle(),
     admin.from("system_settings").select("setting_value").eq("setting_key","maintenance").maybeSingle(),
   ]);

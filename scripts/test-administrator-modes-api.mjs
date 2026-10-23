@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import Module from 'node:module';
+import ts from 'typescript';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+const compile=(file,resolve)=>{const m=new Module(file);m.require=resolve;m._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,file);return m.exports;};
+const access=compile('src/lib/auth/account-access.ts',id=>{throw Error(id);});
+let profile=null,writes=[],rpcError=null;
+const {POST}=compile('src/app/api/auth/admin-mode/route.ts',id=>{
+ if(id==='@/lib/auth/account-access')return access;
+ if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>profile};
+ if(id==='@/lib/api-response')return {fail:(code,message,status=400)=>Response.json({success:false,error:{code,message}},{status}),ok:data=>Response.json({success:true,data})};
+ if(id==='@/lib/supabase/server')return {createSupabaseServerClient:async()=>({rpc:async(fn,args)=>{writes.push({fn,args});return {data:{mode:args.normal_mode?'normal':'admin'},error:rpcError};}})};
+ throw Error(id);
+});
+const call=(body={mode:'normal'},origin='http://localhost')=>POST(new Request('http://localhost/api/auth/admin-mode',{method:'POST',headers:{origin},body:typeof body==='string'?body:JSON.stringify(body)}));
+let checks=0;const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};
+eq((await call()).status,401);
+profile={role:'staff',account_status:'active',approval_status:'approved'};eq((await call()).status,403);
+profile={...profile,role:'member'};eq((await call()).status,403);
+profile={...profile,role:'admin',admin_account:true};eq((await call({},'https://foreign.test')).status,403);
+for(const change of [{account_status:'restricted'},{account_status:'suspended'},{approval_status:'pending'},{withdrawal_pending:true}]){const saved=profile;profile={...saved,...change};eq((await call()).status,403);profile=saved;}
+for(const body of ['{','null',{mode:'owner'},{mode:'normal',padding:'x'.repeat(250)}])eq((await call(body)).status,400);
+eq(writes.length,0);
+const normal=await call({mode:'normal',user_id:'another-account',role:'admin'});eq(normal.status,200);eq(normal.headers.get('cache-control'),'private, no-store');eq(writes.at(-1),{fn:'set_administrator_mode',args:{normal_mode:true}});
+profile={...profile,role:'staff',staff_position:'staff',admin_mode_normal:true};eq(access.canAdminister(profile),false);eq(access.canRegisterTrackingEntries(profile),true);eq(access.canSwitchAdministratorMode(profile),true);
+eq((await call({mode:'admin'})).status,200);eq(writes.at(-1).args,{normal_mode:false});
+rpcError={message:'FORBIDDEN'};eq((await call()).status,409);
+const {AdministratorModeSwitch}=compile('src/components/navigation/administrator-mode-switch.tsx',id=>id==='@/lib/auth/account-access'?access:require(id));
+const render=p=>renderToStaticMarkup(createElement(AdministratorModeSwitch,{profile:p}));
+eq(render({...profile,admin_account:false}),'');
+eq(render({...profile,account_status:'restricted'}),'');
+eq(render(profile).includes('관리자 모드로 전환'),true);
+eq(render({...profile,role:'admin',admin_mode_normal:false}).includes('일반 모드로 전환'),true);
+console.log(`Administrator mode API and access: ${checks} checks passed`);

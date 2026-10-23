@@ -1,4 +1,5 @@
 'use client';
+import {isAdministratorAccount} from '@/lib/auth/account-access';
 import {useState} from 'react';
 import Link from 'next/link';
 import {MemberActions} from './member-actions';
@@ -6,7 +7,7 @@ import {MemberDelete} from './member-delete';
 import {memberRole} from '@/lib/member-directory';
 
 
-export type DirectoryMember={user_id:string;name:string;nickname:string|null;role:string;staff_position:string|null;account_status:string;login_id:string;ranking_excluded:boolean;is_pacer:boolean};
+export type DirectoryMember={user_id:string;name:string;nickname:string|null;role:string;admin_account?:boolean;admin_mode_normal?:boolean;staff_position:string|null;account_status:string;login_id:string;ranking_excluded:boolean;is_pacer:boolean};
 const states:Record<string,string>={active:'정상',restricted:'신청 제한',suspended:'이용 정지',withdrawn:'탈퇴 완료',pending:'승인 대기',approved:'승인 완료',rejected:'거절',cancelled:'취소'};
 
 
@@ -40,6 +41,6 @@ export function MemberDirectory({members,canEdit,isAdmin,selfId}:{members:Direct
 function MemberPanel({member,canEdit,isAdmin,selfId}:{member:DirectoryMember;canEdit:boolean;isAdmin:boolean;selfId:string}){
  const m=member;
  return <section id={`member-${member.user_id}`} className="member-detail-panel" aria-label={`${member.name} 회원 정보`}><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">역할 · 활성 상태</h3><Link href={`/admin/members/${member.user_id}`} className="button-secondary">상세 보기 →</Link></div>
- <div className="mt-4">{canEdit?<><MemberActions userId={m.user_id} role={m.role} position={m.staff_position} status={m.account_status} excluded={m.ranking_excluded} isPacer={m.is_pacer} actorIsAdmin={isAdmin} self={m.user_id===selfId} />{m.role!=='admin'&&m.user_id!==selfId&&<div className="mt-5 border-t pt-4"><MemberDelete userId={m.user_id} loginId={m.login_id} name={m.name}/></div>}</>:<p>조회 전용입니다. {memberRole(m.role,m.staff_position)} · {states[m.account_status]??m.account_status}</p>}</div>
+ <div className="mt-4">{canEdit?<><MemberActions userId={m.user_id} role={isAdministratorAccount(m)?"admin":m.role} position={m.staff_position} status={m.account_status} excluded={m.ranking_excluded} isPacer={m.is_pacer} actorIsAdmin={isAdmin} self={m.user_id===selfId} />{!isAdministratorAccount(m)&&m.user_id!==selfId&&<div className="mt-5 border-t pt-4"><MemberDelete userId={m.user_id} loginId={m.login_id} name={m.name}/></div>}</>:<p>조회 전용입니다. {memberRole(m.role,m.staff_position)} · {states[m.account_status]??m.account_status}</p>}</div>
  </section>;
 }

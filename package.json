@@ -14,6 +14,7 @@
     "test:tracking-staff-api": "node scripts/test-tracking-staff-api.mjs",
     "test:tracking-source-api": "node scripts/test-tracking-source-api.mjs",
     "test:tracking": "node scripts/test-tracking.mjs",
+    "test:administrator-modes": "node scripts/test-administrator-modes-api.mjs && node scripts/test-administrator-modes-database.mjs",
     "test:auth": "node scripts/test-auth.mjs",
     "test:release": "node scripts/test-release.mjs",
     "test:schedule-overview-server": "node scripts/test-schedule-overview-server.mjs",

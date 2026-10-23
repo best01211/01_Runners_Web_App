@@ -15,6 +15,7 @@ export function ServiceAccessMonitor() {
     let checking = false;
     const controller = new AbortController();
     let lastCheck = 0;
+    let previousMode:boolean|undefined;
     async function check(force = false) {
       if (checking || document.visibilityState !== "visible" || (!force && Date.now() - lastCheck < 1000)) return;
       lastCheck = Date.now();
@@ -23,6 +24,10 @@ export function ServiceAccessMonitor() {
         const response = await fetch("/api/auth/service-status", { cache: "no-store", signal: controller.signal });
         if (!response.ok && response.status !== 401) return;
         const { destination, profile, blockedFeatures } = await response.json();
+        if(profile?.admin_account){
+          if(previousMode!==undefined&&previousMode!==profile.admin_mode_normal&&!disposed){window.location.replace("/dashboard");return;}
+          previousMode=profile.admin_mode_normal;
+        }
         const feature=requestFeature(currentPath.current,"GET");
         if(!disposed&&feature&&blockedFeatures?.[feature]){window.location.replace("/maintenance");return;}
         if (!disposed) window.dispatchEvent(new CustomEvent("service-identity", { detail: profile ?? null }));
@@ -36,6 +41,8 @@ export function ServiceAccessMonitor() {
     const timer = window.setInterval(() => void check(), 10000);
     const resume = () => void check();
     const profileUpdated = () => void check(true);
+    const modeChanged=(event:StorageEvent)=>{if(event.key==="runners-admin-mode-change")window.location.replace("/dashboard");};
+    window.addEventListener("storage",modeChanged);
     window.addEventListener("profile-updated", profileUpdated);
     window.addEventListener("focus", resume);
     document.addEventListener("visibilitychange", resume);
@@ -44,6 +51,7 @@ export function ServiceAccessMonitor() {
       controller.abort();
       window.clearInterval(timer);
       window.removeEventListener("profile-updated", profileUpdated);
+      window.removeEventListener("storage",modeChanged);
       window.removeEventListener("focus", resume);
       document.removeEventListener("visibilitychange", resume);
     };

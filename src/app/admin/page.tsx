@@ -23,7 +23,7 @@ export default async function AdminPage({searchParams}:{searchParams:Promise<{ta
  let members=null,seasons=null,setting=null,withdrawals=null;
  const templates=tab==='templates'?await loadRegularTemplates():[];
  if(tab==='members'){
-  let query=client.from('profiles').select('user_id,login_id,name,nickname,role,staff_position,account_status,ranking_excluded,is_pacer').order('created_at',{ascending:false}).order('user_id');
+  let query=client.from('profiles').select('user_id,login_id,name,nickname,role,admin_account,admin_mode_normal,staff_position,account_status,ranking_excluded,is_pacer').order('created_at',{ascending:false}).order('user_id');
   if(!isAdmin)query=query.neq('role','admin');
   const [rows,withdrawalResult]=await Promise.all([
    readAllPages((from,to)=>query.range(from,to)),

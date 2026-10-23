@@ -30,6 +30,10 @@ export function decodePageContext(token:string|null,cookie:string,now=Date.now()
   if(context.version!==VERSION||!Number.isFinite(context.issuedAt)||now<context.issuedAt||now-context.issuedAt>MAX_AGE_MS||context.cookie!==cookieBinding(cookie)||typeof context.pathname!=="string"||!canPassPageContext(context.pathname,"GET"))return null;
   const profile=context.profile;
   if(!profile||typeof profile.user_id!=="string"||typeof profile.login_id!=="string"||typeof profile.name!=="string"||!['guest','member','staff','admin'].includes(profile.role)||!['active','restricted'].includes(profile.account_status)||profile.approval_status!=="approved"||profile.withdrawal_pending!==false)return null;
+  if(profile.admin_account!==undefined&&typeof profile.admin_account!=="boolean")return null;
+  if(profile.admin_mode_normal!==undefined&&typeof profile.admin_mode_normal!=="boolean")return null;
+  if(profile.admin_mode_normal===true&&(!profile.admin_account||profile.role!=="staff"||profile.staff_position!=="staff"))return null;
+  if(profile.admin_account===true&&profile.admin_mode_normal!==true&&profile.role!=="admin")return null;
   return profile as CurrentProfile;
  }catch{return null;}
 }

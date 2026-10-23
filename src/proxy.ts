@@ -56,7 +56,7 @@ async function runProxy(request: NextRequest) {
   }
 
   const [profileResult, withdrawalResult, maintenanceResult] = await Promise.all([
-    supabase.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,is_pacer,staff_position,profile_image_url").eq("user_id", user.id).maybeSingle(),
+    supabase.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,is_pacer,staff_position,profile_image_url,admin_account,admin_mode_normal").eq("user_id", user.id).maybeSingle(),
     supabase.from("withdrawal_requests").select("request_id").eq("user_id",user.id).eq("status","pending").maybeSingle(),
     createSupabaseAdminClient().from("system_settings").select("setting_value").eq("setting_key", "maintenance").maybeSingle(),
   ]);

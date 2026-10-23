@@ -1,4 +1,10 @@
 type Account = { account_status: string; approval_status: string; role: string; withdrawal_pending?: boolean };
+export function isAdministratorAccount(profile:{role:string;admin_account?:boolean}|null|undefined):boolean {
+  return !!profile&&(profile.admin_account===true||profile.role==="admin");
+}
+export function canSwitchAdministratorMode(profile:(Account&{admin_account?:boolean})|null|undefined):boolean {
+  return isAdministratorAccount(profile)&&canStartActivity(profile);
+}
 export function canUseService(profile: Account | null | undefined): boolean {
   return Boolean(profile && ["active", "restricted"].includes(profile.account_status) && profile.approval_status === "approved" && ["guest","member","staff","admin"].includes(profile.role) && !profile.withdrawal_pending);
 }
