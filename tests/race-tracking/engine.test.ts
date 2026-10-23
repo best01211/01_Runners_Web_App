@@ -159,3 +159,27 @@ test("Seoul half-marathon demo finishes on its GPX course without full-marathon 
  assert.equal(state.distanceMeters, DEMO_COURSE.distanceMeters);
  assert.deepEqual(state.position, DEMO_COURSE.points.at(-1));
 });
+
+test("a shorter or longer GPX preserves official-distance progress and finish position",()=>{
+ const points=[{latitude:37,longitude:127},{latitude:37,longitude:127.1},{latitude:37,longitude:127.2}];
+ for(const officialDistance of [10000,42195]){
+  const scaled=buildCourse(points,officialDistance);
+  near(positionAtDistance(scaled,officialDistance/2).longitude,127.1);
+  assert.deepEqual(positionAtDistance(scaled,officialDistance),points[2]);
+  const estimated=trackRunner({...runner,targetTimeSeconds:7200},[],scaled,start+1800_000);
+  near(estimated.distanceMeters,officialDistance/4);
+  near(estimated.position.longitude,127.05);
+ }
+});
+
+test("group prediction overrides personal targets until first 5km then uses actual pace",()=>{
+ const r={useGroupPrediction:true,groupPaceSeconds:300,targetPaceSeconds:240,targetTimeSeconds:4000};
+ const early=track([checkpoint(0,120),checkpoint(2000,720)],900,r);
+ assert.equal(early.paceSource,"pace-group");near(early.paceSeconds,300);
+ const measured=track([checkpoint(0,120),checkpoint(2000,720),checkpoint(5000,1770)],1800,r);
+ assert.equal(measured.paceSource,"timing");near(measured.paceSeconds,330);
+ const scheduled=track([checkpoint(5000,1800)],1860,r);
+ near(scheduled.paceSeconds,360);assert.equal(scheduled.startSource,"scheduled");assert.equal(scheduled.confidence,"LOW");
+ const late=track([checkpoint(0,0),checkpoint(5000,1500),checkpoint(10000,3300)],3360,r);
+ near(late.paceSeconds,(360*0.5+300*0.3)/0.8);
+});

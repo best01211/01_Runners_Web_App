@@ -7,6 +7,7 @@ const positive = (value: number | undefined): value is number =>
 export function initialPace(runner: Runner, distanceMeters: number): {
   paceSeconds: number; paceSource: TrackingState["paceSource"];
 } {
+  if (runner.useGroupPrediction && positive(runner.groupPaceSeconds)) return { paceSeconds: runner.groupPaceSeconds, paceSource: "pace-group" };
   if (positive(runner.targetTimeSeconds)) return {
     paceSeconds: runner.targetTimeSeconds / (distanceMeters / 1000), paceSource: "target-time" };
   if (positive(runner.targetPaceSeconds)) return { paceSeconds: runner.targetPaceSeconds, paceSource: "target-pace" };
@@ -45,9 +46,17 @@ export function trackRunner(runner: Runner, records: Checkpoint[], course: Cours
   const startTime = actualStart ? Date.parse(actualStart.passedAt) : start;
   const elapsedSeconds = Math.max(0, (now - startTime) / 1000);
   const segments: number[] = [];
+  // New group registrations switch at the first 5km observation, even if START
+  // was not measured. In that case the UI explicitly labels scheduled-start timing.
+  const firstTimed = valid.find(c => c.distanceMeters >= 5000);
+  if (runner.useGroupPrediction && firstTimed) {
+    const pace = (Date.parse(firstTimed.passedAt) - startTime) / firstTimed.distanceMeters;
+    if (pace >= 120 && pace <= 1200) segments.push(pace);
+  }
   // Only measured pairs establish timing pace; scheduled start is not a measurement.
   for (let i = 1; i < valid.length; i++) {
     const a = valid[i - 1], b = valid[i];
+    if (runner.useGroupPrediction && (!firstTimed || b.distanceMeters <= firstTimed.distanceMeters)) continue;
     const secondsPerKm = (Date.parse(b.passedAt) - Date.parse(a.passedAt)) /
       (b.distanceMeters - a.distanceMeters);
     if (secondsPerKm >= 120 && secondsPerKm <= 1200) segments.push(secondsPerKm);
@@ -76,7 +85,7 @@ export function trackRunner(runner: Runner, records: Checkpoint[], course: Cours
     ["dnf", "dns", "stale"].includes(status) ? null :
       finishElapsed + (course.distanceMeters - anchor) / 1000 * paceSeconds;
   return { runner, distanceMeters, paceSeconds, paceSource, status, lastCheckpoint: last,
-    confidence: !last || paceSource !== "timing" ? "LOW" : age! <= 300 ? "HIGH" : age! <= 900 ? "MEDIUM" : "LOW",
+    confidence: !last || paceSource !== "timing" || (runner.useGroupPrediction&&!actualStart) ? "LOW" : age! <= 300 ? "HIGH" : age! <= 900 ? "MEDIUM" : "LOW",
     secondsSinceCheckpoint: age, estimatedFinishSeconds, elapsedSeconds,
     startSource: actualStart ? "measured" : "scheduled",
     position: positionAtDistance(course, distanceMeters) };

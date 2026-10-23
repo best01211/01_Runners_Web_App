@@ -5,4 +5,8 @@ export type RaceSnapshot = {
  runners: Runner[]; checkpoints: Record<string, Checkpoint[]>;
  participants: { userId: string; name: string }[];
  entries: { entryId: string; userId: string; bib: string }[];
+ raceId?: string;
+ eventId?: string;
+ courses?: { raceId: string; name: string; distanceMeters: number; startAt: string }[];
+ groups?: { groupId: string; name: string; paceSeconds: number }[];
 };

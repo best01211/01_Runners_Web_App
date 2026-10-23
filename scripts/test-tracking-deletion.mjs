@@ -12,11 +12,19 @@ const compile=(file,resolve)=>{
 };
 const access=compile('src/lib/auth/account-access.ts',id=>{throw new Error(id)});
 const route=compile('src/app/api/tracking/[raceId]/route.ts',id=>{
+ if(id==='@/lib/tracking-snapshot-server')return {};
  if(id==='@/lib/auth/account-access')return access;
  if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>profile};
  if(id==='@/lib/api-response')return {fail:(code,message,status=400)=>Response.json({success:false,error:{code,message}},{status}),ok:data=>Response.json({success:true,data})};
  if(id==='@/lib/race-tracking/validation')return {isUUID:value=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)};
- if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from(table){assert.equal(table,'tracking_races');return {update(value){assert.deepEqual(value,{status:'archived'});writes++;return {eq(key,value){assert.equal(key,'race_id');assert.equal(value,row?.race_id??uuid);return {select:()=>({maybeSingle:async()=>({data:row,error:dbError})})}}}}}}})};
+ if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from(table){
+  assert.equal(table,'tracking_races');
+  return {update(value){assert.deepEqual(value,{status:'archived'});writes++;
+   return {or(filter){assert.equal(filter,`race_id.eq.${uuid},parent_race_id.eq.${uuid}`);
+    return {select:async()=>({data:row?[row]:[],error:dbError})};
+   }};
+  }};
+ }})};
  if(id==='@/lib/supabase/server')return {};
  throw new Error(`Unexpected import: ${id}`);
 });
@@ -31,6 +39,7 @@ for(const p of [
  {...active,role:'admin',account_status:'restricted'},
  {...active,role:'admin',withdrawal_pending:true},
  {...active,role:'admin',approval_status:'pending'},
+ {...active,role:'staff',staff_position:'president',service_blocked:{liveTracking:true}},
 ]) {profile=p;assert.equal((await call()).status,403);}
 assert.equal(writes,0);
 profile={...active,role:'admin'};

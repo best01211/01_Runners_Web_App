@@ -21,6 +21,8 @@ export type Runner = {
   targetTimeSeconds?: number;
   targetPaceSeconds?: number;
   groupPaceSeconds?: number;
+  groupName?: string;
+  useGroupPrediction?: boolean;
   status: "running" | "dnf" | "dns";
 };
 export type TrackingState = {

@@ -14,19 +14,21 @@ export async function DELETE(request: Request, { params }: Context) {
  const profile = await getCurrentProfile();
  if (!profile) return fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
  if (!canAdminister(profile)) return fail("FORBIDDEN", "관리자만 추적 이벤트를 삭제할 수 있습니다.", 403);
+ if(profile.service_blocked?.liveTracking)return fail("FORBIDDEN","현재 추적 기능을 이용할 수 없습니다.",403);
  const { raceId } = await params;
  if (!isUUID(raceId)) return fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404);
  const admin = createSupabaseAdminClient();
  // Keep related entries/checkpoints intact, and use the existing visibility policy.
- const { data, error } = await admin.from("tracking_races").update({status:"archived"}).eq("race_id",raceId).select("race_id").maybeSingle();
+ const { data, error } = await admin.from("tracking_races").update({status:"archived"}).or(`race_id.eq.${raceId},parent_race_id.eq.${raceId}`).select("race_id");
  if (error) return fail("DELETE_FAILED", "이벤트를 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.", 503);
- if (!data) return fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404);
+ if (!data?.length) return fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404);
  return ok({deleted:true});
 }
 async function context(raceId: string) {
  const profile = await getCurrentProfile();
  if (!profile) return { error: fail("UNAUTHORIZED", "로그인이 필요합니다.", 401) };
  if (!canUseService(profile)) return { error: fail("FORBIDDEN", "승인된 활성 회원만 이용할 수 있습니다.", 403) };
+ if(profile.service_blocked?.liveTracking)return {error:fail("FORBIDDEN","현재 추적 기능을 이용할 수 없습니다.",403)};
  if (!isUUID(raceId)) return { error: fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404) };
  const admin = createSupabaseAdminClient();
  const { data: schedule, error } = await admin.from("tracking_races").select("name,status").eq("race_id", raceId).maybeSingle();
@@ -46,6 +48,8 @@ export async function GET(_:Request,{params}:Context){
 }
 
 const errors: Record<string, string> = {
+ DUPLICATE_COURSE:"이미 등록된 종목 이름입니다.", INVALID_COURSE:"종목 이름과 코스 정보를 확인해주세요.",
+ GROUP_REQUIRED:"먼저 해당 종목의 그룹을 선택해주세요.", EVENT_ENTRY_EXISTS:"이미 이 대회의 다른 종목에 등록된 회원입니다.", GROUP_LIMIT:"종목별 그룹은 50개까지 등록할 수 있습니다.",
  RACE_FORBIDDEN: "변경 권한이 없습니다.", RACE_NOT_FOUND: "진행 가능한 이벤트가 아닙니다.",
  COURSE_LOCKED: "선수가 등록된 코스는 변경할 수 없습니다.", COURSE_REQUIRED: "먼저 코스를 등록해주세요.",
  NOT_PARTICIPANT: "승인된 활성 회원만 출전 등록할 수 있습니다.", ENTRY_LOCKED: "출발 이후 또는 계측 기록이 있는 선수 정보는 수정할 수 없습니다.",
@@ -68,7 +72,7 @@ export async function POST(request: Request, { params }: Context) {
  const { error } = await client.rpc("write_tracking_race", { target_race: raceId, payload: write });
  if (error) {
   if (["42P01","PGRST202","PGRST205"].includes(error.code)) return databaseFailure(error.code);
-  if (error.code === "23505") return fail("DUPLICATE", "이미 등록된 배번호 또는 계측 지점입니다.", 409);
+  if (error.code === "23505") return fail("DUPLICATE", "이미 등록된 배번호·그룹명 또는 계측 지점입니다.", 409);
   const message = errors[error.message];
   return fail("WRITE_FAILED", message ?? "저장하지 못했습니다. 입력값과 DB 설정을 확인해주세요.", message ? 409 : 400);
  }

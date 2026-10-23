@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+.tracking-progress { appearance: none; height: 6px; border: 0; border-radius: 999px; overflow: hidden; background: #e0e0da; }
+.tracking-progress::-webkit-progress-bar { background: #e0e0da; border-radius: 999px; }
+.tracking-progress::-webkit-progress-value { background: #22261f; border-radius: 999px; }
+.tracking-progress::-moz-progress-bar { background: #22261f; border-radius: 999px; }
+
 
 :root {
   --background: #F8F9FA;
@@ -668,3 +673,7 @@ input[type=checkbox] { width: 20px; height: 20px; }
 .navigation-progress { position: absolute; bottom: 3px; left: 22%; right: 22%; height: 2px; border-radius: 2px; background: currentColor; animation: navigation-progress-in .2s ease-out .25s both; }
 @keyframes navigation-progress-in { from { opacity: 0; transform: scaleX(.3); } to { opacity: .6; transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .navigation-progress { animation: none; } }
+
+/* Keep preloaded GPX vectors visible while panning beyond Leaflet's SVG viewport.
+   The outer map container still clips the map to its card. */
+.tracking-map .leaflet-overlay-pane > svg { overflow: visible; }

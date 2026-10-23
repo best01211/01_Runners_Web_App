@@ -2,8 +2,9 @@ import { buildCourse } from "./course";
 import type { Coordinate } from "./types";
 
 export type RaceWrite =
- | { action: "course"; name: string; distanceMeters: number; points: Coordinate[]; startAt: string }
- | { action: "entry"; userId: string; bib: string; targetPaceSeconds: number | null }
+ | { action: "course"; name: string; distanceMeters: number; points: Coordinate[]; startAt: string; courseName?: string; parentRaceId?: string }
+ | { action: "group"; name: string; paceSeconds: number }
+ | { action: "entry"; userId: string; bib: string; targetPaceSeconds: number | null; groupId?: string }
  | { action: "checkpoint"; entryId: string; name: string; distanceMeters: number; passedAt: string }
  | { action: "status"; entryId: string; status: "running" | "dnf" | "dns" };
 export const isUUID = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -30,15 +31,18 @@ export function validateRaceWrite(value: unknown): RaceWrite {
   });
   const distanceMeters = number(b.distanceMeters, 1000, 100000);
   buildCourse(points, distanceMeters);
-  return { action: "course", name: text(b.name, 100), points, distanceMeters, startAt: time(b.startAt) };
+  if(b.parentRaceId!==undefined&&!isUUID(b.parentRaceId))throw new Error("대회를 선택해주세요.");
+  return { action: "course", name: text(b.name, 100), points, distanceMeters, startAt: time(b.startAt), ...(b.courseName!==undefined?{courseName:text(b.courseName,60)}:{}), ...(b.parentRaceId?{parentRaceId:b.parentRaceId as string}:{}) };
  }
+ if(b.action==="group") { const paceSeconds=number(b.paceSeconds,120,1200);if(!Number.isInteger(paceSeconds))throw new Error("페이스는 정수 초로 입력해주세요.");return {action:"group",name:text(b.name,40),paceSeconds}; }
  if (b.action === "entry") {
   if (!isUUID(b.userId)) throw new Error("회원을 선택해주세요.");
   const bib = text(b.bib, 20);
   if (!/^[A-Za-z0-9-]+$/.test(bib)) throw new Error("배번호는 영문·숫자·하이픈만 사용할 수 있습니다.");
   const pace = b.targetPaceSeconds === null ? null : number(b.targetPaceSeconds, 120, 1200);
   if (pace !== null && !Number.isInteger(pace)) throw new Error("페이스는 정수 초로 입력해주세요.");
-  return { action: "entry", userId: b.userId, bib, targetPaceSeconds: pace };
+  if(b.groupId!==undefined&&!isUUID(b.groupId))throw new Error("그룹을 선택해주세요.");
+  return { action: "entry", userId: b.userId, bib, targetPaceSeconds: pace, ...(b.groupId?{groupId:b.groupId as string}:{}) };
  }
  if (!isUUID(b.entryId)) throw new Error("출전 선수를 선택해주세요.");
  if (b.action === "status" && ["running","dnf","dns"].includes(String(b.status))) return { action: "status", entryId: b.entryId, status: b.status as "running" | "dnf" | "dns" };

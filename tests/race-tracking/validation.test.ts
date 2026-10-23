@@ -30,3 +30,13 @@ test("checkpoint validation retains exact finish distance and normalized time",(
  assert.deepEqual(result,{action:"checkpoint",entryId:id,name:"FINISH",distanceMeters:42195,passedAt:"2026-10-11T03:00:00.000Z"});
  assert.throws(()=>validateRaceWrite({action:"checkpoint",entryId:id,name:"5K",distanceMeters:-1,passedAt:course.startAt}));
 });
+
+test("groups and course parents validate IDs and integer pace bounds",()=>{
+ assert.deepEqual(validateRaceWrite({action:"group",name:" B그룹 ",paceSeconds:330}),{action:"group",name:"B그룹",paceSeconds:330});
+ for(const paceSeconds of [119,1201,300.5,NaN,"300"])assert.throws(()=>validateRaceWrite({action:"group",name:"B",paceSeconds}));
+ assert.throws(()=>validateRaceWrite({...course,parentRaceId:"fake",courseName:"10K"}));
+ assert.throws(()=>validateRaceWrite({...course,courseName:" "}));
+ const entry=validateRaceWrite({action:"entry",userId:id,bib:"001",targetPaceSeconds:null,groupId:id});
+ assert.equal(entry.action,"entry");if(entry.action==="entry")assert.equal(entry.groupId,id);
+ assert.throws(()=>validateRaceWrite({action:"entry",userId:id,bib:"001",targetPaceSeconds:null,groupId:"fake"}));
+});
