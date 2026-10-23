@@ -43,7 +43,7 @@ async function write(request: Request, context: Context, method: "POST" | "PATCH
  const { data, error } = await client.rpc("write_attendance", { target_schedule_id: scheduleId, payload: { ...body, action } });
  if (!error) return ok(data);
  console.error("Attendance RPC failed", { scheduleId, action, code: error.code, message: error.message, details: error.details, hint: error.hint });
- const messages: Record<string, string> = { FORBIDDEN: "출석 처리 권한이 없습니다.", SCHEDULE_UNAVAILABLE: "취소되었거나 사용할 수 없는 일정입니다.", ALREADY_OPENED: "이미 출석을 시작했습니다.", ALREADY_CHECKED: "이미 처리된 출석입니다. 변경은 운영진에게 요청해주세요.", ATTENDANCE_CLOSED: "출석 입력 시간이 아닙니다.", INVALID_CODE: "출석번호가 일치하지 않습니다.", NOT_PARTICIPANT: "참가 신청자만 출석할 수 있습니다.", INVALID_STATUS: "출석 상태가 올바르지 않습니다." };
+ const messages: Record<string, string> = { FORBIDDEN: "출석 처리 권한이 없습니다.", SCHEDULE_UNAVAILABLE: "취소되었거나 사용할 수 없는 일정입니다.", ALREADY_OPENED: "이미 출석을 시작했습니다.", ALREADY_CHECKED: "이미 처리된 출석입니다. 변경은 운영진에게 요청해주세요.", SCHEDULE_NOT_STARTED:"일정 시작 시각부터 출석할 수 있습니다.", ATTENDANCE_CLOSED: "출석 입력 시간이 아닙니다.", INVALID_CODE: "출석번호가 일치하지 않습니다.", NOT_PARTICIPANT: "참가 신청자만 출석할 수 있습니다.", INVALID_STATUS: "출석 상태가 올바르지 않습니다." };
  const key = Object.keys(messages).find(key => error.message.includes(key));
  return fail(key ?? "DATABASE_ERROR", key ? messages[key] : "출석 저장에 실패했습니다. 아래 오류 정보를 확인해주세요.", key === "FORBIDDEN" ? 403 : key ? 409 : 500, !key && isStaffOrAdmin(profile) ? { databaseCode: error.code, databaseMessage: error.message } : undefined);
 }
