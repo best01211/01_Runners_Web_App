@@ -3,7 +3,7 @@ import {ScheduleCalendar} from '@/components/schedules/schedule-calendar';
 import {Icon} from "@/components/ui/icon";
 import Link from "next/link";
 import {redirect} from "next/navigation";
-import {getCurrentProfile,isStaffOrAdmin,canStartActivity} from "@/lib/auth/current-user";
+import {getCurrentPageProfile as getCurrentProfile,isStaffOrAdmin,canStartActivity} from "@/lib/auth/current-user";
 import {loadUpcomingSchedules,loadScheduleHistoryOrMonth} from '@/lib/schedule-overview-server';
 import {koreaDay} from '@/lib/schedule-overview';
 import {scheduleTypeLabels} from '@/lib/schedule-labels';

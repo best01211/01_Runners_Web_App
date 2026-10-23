@@ -2,7 +2,7 @@ import {RankingView} from "@/components/ranking/ranking-view";
 import {canAdminister} from "@/lib/auth/account-access";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile } from "@/lib/auth/current-user";
 import { loadRanking } from "@/lib/ranking-server";
 export default async function Page({ searchParams }: { searchParams: Promise<{ seasonId?: string }> }) {
  const p = await getCurrentProfile();

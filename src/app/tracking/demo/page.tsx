@@ -2,7 +2,7 @@ import {canAdminister} from "@/lib/auth/account-access";
 import Link from "next/link";
 import { TrackingTabs } from "@/components/race-tracking/tracking-tabs";
 import { redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile } from "@/lib/auth/current-user";
 import { TrackingDemo } from "@/components/race-tracking/tracking-demo";
 
 export const metadata = { title: "선수 추적 데모 | 01Runners" };

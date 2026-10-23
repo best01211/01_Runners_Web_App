@@ -14,7 +14,7 @@ let finishRanking;let scheduleReads=0;let rankingReads=0;
 const ranking=new Promise(resolve=>{finishRanking=resolve;});
 const modules=new Map();
 const mocks={
- "@/lib/auth/current-user":{getCurrentProfile:async()=>({user_id:"me",name:"테스트",nickname:null,role:"member",account_status:"active",approval_status:"approved"})},
+ "@/lib/auth/current-user":{getCurrentPageProfile:async()=>({user_id:"me",name:"테스트",nickname:null,role:"member",account_status:"active",approval_status:"approved"})},
  "@/lib/ranking-server":{loadRanking:()=>{rankingReads++;return ranking;}},
  "@/lib/schedule-overview-server":{loadUpcomingSchedules:async()=>{scheduleReads++;return [{schedule_id:"test",title:"STREAMED_SCHEDULE_DATA",schedule_type:"regular",status:"open",start_at:"2099-01-01T00:00:00Z",end_at:"2099-01-01T01:00:00Z",registration_end_at:"2098-12-31T00:00:00Z",location:"잠실",capacity:60}];}},
 };

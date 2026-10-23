@@ -4,7 +4,7 @@ import {canAdminister} from "@/lib/auth/account-access";
 import {canUseService} from "@/lib/auth/account-access";
 import Link from "next/link";
 import { redirect,notFound } from "next/navigation";
-import { getCurrentProfile } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile } from "@/lib/auth/current-user";
 import { isUUID } from "@/lib/race-tracking/validation";
 import { TrackingTabs } from "@/components/race-tracking/tracking-tabs";
 import { LiveTracking } from "@/components/race-tracking/live-tracking";

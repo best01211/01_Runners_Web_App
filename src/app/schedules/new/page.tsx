@@ -1,6 +1,6 @@
 import { loadRegularTemplates } from "@/lib/regular-run-templates-server";
 import { redirect } from "next/navigation";
-import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { ScheduleForm } from "@/components/schedules/schedule-form";
 
 export default async function NewSchedulePage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import {getCurrentProfile} from "@/lib/auth/current-user";
+import {getCurrentPageProfile as getCurrentProfile} from "@/lib/auth/current-user";
 import {parseMaintenanceSetting,canAccessDuringService,SERVICE_FEATURES} from "@/lib/service-policy";
 export const dynamic = "force-dynamic";
 export default async function MaintenancePage(){

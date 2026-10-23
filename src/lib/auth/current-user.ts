@@ -1,3 +1,5 @@
+import {headers} from "next/headers";
+import {PAGE_CONTEXT_HEADER,decodePageContext} from "./page-context";
 import { cache } from "react";
 import { measure } from "@/lib/performance";
 import {parseMaintenanceSetting,type ServiceFeature} from "@/lib/service-policy";
@@ -51,6 +53,14 @@ export const getCurrentProfile = cache(async (): Promise<CurrentProfile | null> 
   if(serviceError||!config)return null;
   return { ...data, service_blocked:config.status==="restricted"?config.blocked:{}, withdrawal_pending: Boolean(withdrawal) } as CurrentProfile;
 }));
+
+// Page rendering only. API handlers deliberately continue using getCurrentProfile.
+export const getCurrentPageProfile=cache(async():Promise<CurrentProfile|null>=>{
+ const requestHeaders=await headers();
+ const verified=decodePageContext(requestHeaders.get(PAGE_CONTEXT_HEADER),requestHeaders.get("cookie")??"");
+ if(verified)return verified;
+ return getCurrentProfile();
+});
 
 export function publicName(profile: Pick<CurrentProfile, "nickname" | "login_id">) {
   return profile.nickname?.trim() || profile.login_id;

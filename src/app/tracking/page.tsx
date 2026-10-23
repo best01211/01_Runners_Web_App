@@ -4,7 +4,7 @@ import {canAdminister} from "@/lib/auth/account-access";
 import {canUseService} from "@/lib/auth/account-access";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { TrackingTabs } from "@/components/race-tracking/tracking-tabs";
 export const metadata={title:"선수 추적 | 01Runners"};

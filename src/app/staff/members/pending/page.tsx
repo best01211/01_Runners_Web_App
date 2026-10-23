@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ApprovalActions } from "./approval-actions";
 

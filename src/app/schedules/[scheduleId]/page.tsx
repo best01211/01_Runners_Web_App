@@ -6,7 +6,7 @@ import Image from "next/image";
 import { scheduleTypeLabels, scheduleStatusLabels } from "@/lib/schedule-labels";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getCurrentProfile, isStaffOrAdmin, canStartActivity } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile, isStaffOrAdmin, canStartActivity } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { CancelScheduleButton } from "@/components/schedules/cancel-schedule-button";
 import {EventParticipationPanel} from "@/components/participation/event-participation-panel";

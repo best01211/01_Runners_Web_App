@@ -10,7 +10,7 @@ const page=compile('src/app/admin/page.tsx',id=>{
  if(id==='@/lib/query-pagination')return compile('src/lib/query-pagination.ts',require);
  if(id==='@/lib/regular-run-templates-server')return {loadRegularTemplates:async()=>[]};
  if(id==='@/lib/auth/account-access')return access;
- if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>actor,isStaffOrAdmin:p=>access.canStartActivity(p)&&['staff','admin'].includes(p.role)};
+ if(id==='@/lib/auth/current-user')return {getCurrentPageProfile:async()=>actor,getCurrentProfile:async()=>actor,isStaffOrAdmin:p=>access.canStartActivity(p)&&['staff','admin'].includes(p.role)};
  if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>client};
  if(id==='next/navigation')return {redirect:path=>{throw new Error('redirect:'+path)}};
  if(id==='next/link')return function Link(){return null};
@@ -48,7 +48,7 @@ console.log('설정 API: 관리자만 운영 설정 변경 / 회장 점수 변�
 
 
 const operations=compile('src/app/admin/operations/page.tsx',id=>{
- if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>actor,isStaffOrAdmin:p=>access.canStartActivity(p)&&['staff','admin'].includes(p.role)};
+ if(id==='@/lib/auth/current-user')return {getCurrentPageProfile:async()=>actor,getCurrentProfile:async()=>actor,isStaffOrAdmin:p=>access.canStartActivity(p)&&['staff','admin'].includes(p.role)};
  if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>client};
  if(id==='next/navigation')return {redirect:path=>{throw new Error('redirect:'+path)}};
  if(id==='next/link')return function Link(){return null};

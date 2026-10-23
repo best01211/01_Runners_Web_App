@@ -2,7 +2,7 @@ import {canAdminister} from "@/lib/auth/account-access";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getCurrentProfile } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile } from "@/lib/auth/current-user";
 import { RaceRegistrationForm } from "@/components/race-tracking/race-registration-form";
 import { TrackingTabs } from "@/components/race-tracking/tracking-tabs";
 export const metadata={title:"추적 대회 등록 | 01Runners"};

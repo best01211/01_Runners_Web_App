@@ -1,7 +1,7 @@
 import {Suspense} from "react";
 import {measure} from "@/lib/performance";
 import {redirect} from "next/navigation";
-import {getCurrentProfile} from "@/lib/auth/current-user";
+import {getCurrentPageProfile as getCurrentProfile} from "@/lib/auth/current-user";
 import {loadUpcomingSchedules} from "@/lib/schedule-overview-server";
 import {DashboardView,DashboardNext,DashboardUpcoming,DashboardPersonal} from "@/components/dashboard/dashboard-view";
 import {loadRanking} from "@/lib/ranking-server";

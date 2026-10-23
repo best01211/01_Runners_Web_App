@@ -1,3 +1,5 @@
+import {PAGE_CONTEXT_HEADER,encodePageContext,canPassPageContext} from "@/lib/auth/page-context";
+import type {CurrentProfile} from "@/lib/auth/current-user";
 import { measure, timedSupabaseFetch } from "@/lib/performance";
 import {parseMaintenanceSetting,canAccessDuringService,requestFeature,featureBlocked,SERVICE_FEATURES} from "@/lib/service-policy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -18,6 +20,12 @@ export async function proxy(request: NextRequest) {
 }
 
 async function runProxy(request: NextRequest) {
+  // Discard client-supplied context on EVERY path, including early returns.
+  request.headers.delete(PAGE_CONTEXT_HEADER);
+  const pathname = request.nextUrl.pathname;
+  // This endpoint independently verifies auth, profile, withdrawal and maintenance.
+  // Let its Route Handler refresh cookies and perform those checks exactly once.
+  if(pathname==="/api/auth/service-status"&&["GET","HEAD"].includes(request.method))return NextResponse.next({request});
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,7 +44,6 @@ async function runProxy(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const pathname = request.nextUrl.pathname;
   // Recovery routes must remain reachable even for pending or restricted accounts.
   if (["/auth/forgot-password", "/auth/reset-password", "/auth/callback", "/auth/email-change"].includes(pathname)) return response;
 
@@ -49,7 +56,7 @@ async function runProxy(request: NextRequest) {
   }
 
   const [profileResult, withdrawalResult, maintenanceResult] = await Promise.all([
-    supabase.from("profiles").select("role,account_status,approval_status,is_pacer,staff_position").eq("user_id", user.id).maybeSingle(),
+    supabase.from("profiles").select("user_id,login_id,name,nickname,role,account_status,approval_status,is_pacer,staff_position,profile_image_url").eq("user_id", user.id).maybeSingle(),
     supabase.from("withdrawal_requests").select("request_id").eq("user_id",user.id).eq("status","pending").maybeSingle(),
     createSupabaseAdminClient().from("system_settings").select("setting_value").eq("setting_key", "maintenance").maybeSingle(),
   ]);
@@ -108,6 +115,17 @@ async function runProxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
+  if(canPassPageContext(pathname,request.method)){
+    const verifiedProfile={...profile,withdrawal_pending:false,service_blocked:setting.status==="restricted"?setting.blocked:{}} as CurrentProfile;
+    const token=encodePageContext(verifiedProfile,request.headers.get("cookie")??"",pathname);
+    if(token){
+      const forwarded=new Headers(request.headers);forwarded.set(PAGE_CONTEXT_HEADER,token);
+      const next=NextResponse.next({request:{headers:forwarded}});
+      // getUser may have refreshed the session; retain ALL response cookies.
+      response.cookies.getAll().forEach(cookie=>next.cookies.set(cookie));
+      return next;
+    }
+  }
   return response;
 }
 

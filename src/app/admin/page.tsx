@@ -4,7 +4,7 @@ import {canAdminister} from "@/lib/auth/account-access";
 import {MemberDelete} from "@/components/admin/member-delete";
 import Link from "next/link";
 import {redirect} from "next/navigation";
-import {getCurrentProfile,isStaffOrAdmin} from "@/lib/auth/current-user";
+import {getCurrentPageProfile as getCurrentProfile,isStaffOrAdmin} from "@/lib/auth/current-user";
 import {createSupabaseAdminClient} from "@/lib/supabase/admin";
 import {MemberDirectory} from "@/components/admin/member-directory";
 import {WithdrawalActions} from "@/components/admin/withdrawal-actions";

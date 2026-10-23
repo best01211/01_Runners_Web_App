@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {redirect} from 'next/navigation';
-import {getCurrentProfile,isStaffOrAdmin} from '@/lib/auth/current-user';
+import {getCurrentPageProfile as getCurrentProfile,isStaffOrAdmin} from '@/lib/auth/current-user';
 import {createSupabaseAdminClient} from '@/lib/supabase/admin';
 import {ServiceSettings} from '@/components/admin/service-settings';
 

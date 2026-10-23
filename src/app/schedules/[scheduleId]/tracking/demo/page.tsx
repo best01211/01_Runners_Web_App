@@ -1,7 +1,7 @@
 import {canUseService} from "@/lib/auth/account-access";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/auth/current-user";
+import { getCurrentPageProfile as getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TrackingDemo } from "@/components/race-tracking/tracking-demo";
 

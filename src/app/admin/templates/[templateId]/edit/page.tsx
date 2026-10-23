@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {notFound,redirect} from 'next/navigation';
-import {getCurrentProfile,isStaffOrAdmin} from '@/lib/auth/current-user';
+import {getCurrentPageProfile as getCurrentProfile,isStaffOrAdmin} from '@/lib/auth/current-user';
 import {createSupabaseAdminClient} from '@/lib/supabase/admin';
 import {RegularTemplateForm} from '@/components/schedules/regular-template-form';
 import {UUID} from '@/lib/regular-run-templates';
