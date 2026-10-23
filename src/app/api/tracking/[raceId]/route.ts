@@ -1,5 +1,5 @@
 import {loadTrackingSnapshot} from "@/lib/tracking-snapshot-server";
-import {canAdminister} from "@/lib/auth/account-access";
+import {canAdminister,canRegisterTrackingEntries} from "@/lib/auth/account-access";
 import {canUseService} from "@/lib/auth/account-access";
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile } from "@/lib/auth/current-user";
@@ -67,7 +67,7 @@ export async function POST(request: Request, { params }: Context) {
  let write;
  try { const raw = await request.text(); if (raw.length > 2000000) return fail("TOO_LARGE", "요청 크기가 너무 큽니다.", 413); write = validateRaceWrite(JSON.parse(raw)); }
  catch (e) { return fail("INVALID_INPUT", e instanceof Error ? e.message : "입력값을 확인해주세요."); }
- if (!c.canManage) return fail("FORBIDDEN", "관리자만 추적 정보를 등록할 수 있습니다.", 403);
+ if (write.action==="entry"?!canRegisterTrackingEntries(c.profile):!c.canManage) return fail("FORBIDDEN", "해당 추적 정보를 변경할 권한이 없습니다.", 403);
  const client = await createSupabaseServerClient();
  const { error } = await client.rpc("write_tracking_race", { target_race: raceId, payload: write });
  if (error) {

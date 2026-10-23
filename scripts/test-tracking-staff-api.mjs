@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import Module from 'node:module';
+import path from 'node:path';
+import ts from 'typescript';
+const compile=(file,resolve)=>{const m=new Module(file);m.require=resolve;m._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);return m.exports;};
+const local=file=>compile(file,id=>local(path.resolve(path.dirname(file),id+'.ts')));
+const access=local('src/lib/auth/account-access.ts'),validation=local('src/lib/race-tracking/validation.ts'),provider=local('src/lib/race-tracking/myresult.ts');
+let profile=null,writes=[];const race='11111111-1111-4111-8111-111111111111',user='22222222-2222-4222-8222-222222222222',group='33333333-3333-4333-8333-333333333333';
+const response={fail:(code,message,status=400)=>Response.json({success:false,error:{code,message}},{status}),ok:data=>Response.json({success:true,data})};
+const {POST}=compile('src/app/api/tracking/[raceId]/route.ts',id=>{
+ if(id==='@/lib/tracking-snapshot-server')return {};
+ if(id==='@/lib/auth/account-access')return access;
+ if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>profile};
+ if(id==='@/lib/api-response')return response;
+ if(id==='@/lib/race-tracking/validation')return validation;
+ if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{name:'대회',status:'active'},error:null})})})})})};
+ if(id==='@/lib/supabase/server')return {createSupabaseServerClient:async()=>({rpc:async(fn,args)=>{writes.push({fn,args});return {error:null};}})};
+ throw Error(id);
+});
+const entry={action:'entry',userId:user,bib:'00123',groupId:group,targetPaceSeconds:null};
+const call=(body=entry)=>POST(new Request(`http://localhost/api/tracking/${race}`,{method:'POST',headers:{origin:'http://localhost'},body:JSON.stringify(body)}),{params:Promise.resolve({raceId:race})});
+let count=0;const check=(a,b)=>{assert.deepEqual(a,b);count++;};
+check((await call()).status,401);profile={role:'member',account_status:'active',approval_status:'approved'};check((await call()).status,403);
+profile={...profile,role:'staff'};check((await call()).status,200);check(writes.length,1);
+for(const body of [{action:'group',name:'B',paceSeconds:300},{action:'checkpoint',entryId:user,name:'5K',distanceMeters:5000,passedAt:'2026-10-25T09:25:00+09:00'},{action:'status',entryId:user,status:'dnf'},{action:'course',name:'코스',distanceMeters:10000,startAt:'2026-10-25T09:00:00+09:00',points:[{latitude:37,longitude:127},{latitude:38,longitude:127}]}])check((await call(body)).status,403);
+check(writes.length,1);
+profile={...profile,account_status:'restricted'};check((await call()).status,403);profile={...profile,account_status:'active',service_blocked:{liveTracking:true}};check((await call()).status,403);
+profile={...profile,service_blocked:{},withdrawal_pending:true};check((await call()).status,403);
+profile={role:'admin',account_status:'active',approval_status:'approved'};check((await call({action:'group',name:'B',paceSeconds:300})).status,200);
+
+const event=provider.parseTimingEvent({id:176,date:'2026-10-25',name:'대회',courses:[{course_cd:'10K',distance:'10',points:[{point_cd:'P0',lap:1,name:'출발',distance:'0'},{point_cd:'P1',lap:1,name:'5K',distance:'5'}]}]},'176');
+let key=false,requests=0,applies=[];
+const syncClient={rpc:async(fn,args)=>fn==='claim_tracking_sync'?{data:{url:'https://myresult.co.kr/176',code:'10K',token:'lease',version:'version',cursor:null},error:null}:(applies.push(args),{error:null}),from:table=>table==='tracking_races'?{select:()=>({eq:()=>({single:async()=>({data:{distance_meters:10000,start_at:'2026-10-25T09:00:00+09:00'},error:null})})})}:(()=>{const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,gt:()=>q,then:resolve=>Promise.resolve({data:[{entry_id:user,bib:'00123'}],error:null}).then(resolve)};return q;})()};
+const {synchronizeTracking}=compile('src/lib/race-tracking/sync-server.ts',id=>{
+ if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>syncClient};
+ if(id==='./myresult')return provider;
+ if(id==='./myresult-server')return {timingCredentials:()=>key?{'X-Fixture':'fixture'}:null,inspectTimingSource:async()=>event,fetchTimingJSON:async()=>{requests++;return {event_id:176,course_cd:'10K',num:123,records:[]};}};
+ throw Error(id);
+});
+check((await synchronizeTracking(race)).status,'auth-required');check(requests,0);check(applies[0].records,[]);
+key=true;check((await synchronizeTracking(race)).status,'synced');check(requests,1);check(applies[1].token,'lease');check(applies[1].source_version,'version');
+console.log(`Tracking staff API and sync orchestration: ${count} checks passed`);

@@ -11,7 +11,7 @@ export type Checkpoint = {
   distanceMeters: number;
   passedAt: string;
   receivedAt: string;
-  source: "mock" | "manual";
+  source: "mock" | "manual" | "myresult";
 };
 export type Runner = {
   id: string;

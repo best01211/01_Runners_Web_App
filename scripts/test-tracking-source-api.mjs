@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import Module from 'node:module';import ts from 'typescript';import path from 'node:path';
+const compile=(file,resolve)=>{const m=new Module(file);m.require=resolve;m._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);return m.exports;};const local=file=>compile(file,id=>local(path.resolve(path.dirname(file),id+'.ts')));
+const access=local('src/lib/auth/account-access.ts'),validation=local('src/lib/race-tracking/validation.ts'),provider=local('src/lib/race-tracking/myresult.ts');
+let profile=null,key=false,inspects=0,writes=0;const race='11111111-1111-4111-8111-111111111111';
+const event={id:'176',date:'2026-10-25',name:'춘천',courses:[{code:'10K',distanceMeters:10000,points:[]}]};
+const {POST}=compile('src/app/api/tracking/[raceId]/source/route.ts',id=>{
+ if(id==='@/lib/auth/account-access')return access;if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>profile};if(id==='@/lib/race-tracking/validation')return validation;if(id==='@/lib/race-tracking/myresult')return provider;
+ if(id==='@/lib/api-response')return {fail:(code,message,status=400)=>Response.json({success:false,error:{code,message}},{status}),ok:data=>Response.json({success:true,data})};
+ if(id==='@/lib/race-tracking/myresult-server')return {timingCredentials:()=>key?{'X-Fixture-Key':'fixture'}:null,inspectTimingSource:async()=>{inspects++;return event;}};
+ if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from:()=>{const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:{distance_meters:10000,start_at:'2026-10-25T09:00:00+09:00'},error:null})};return q;}})};
+ if(id==='@/lib/supabase/server')return {createSupabaseServerClient:async()=>({rpc:async()=>{writes++;return {error:null};}})};throw Error(id);
+});
+const call=(body,origin='http://localhost')=>POST(new Request(`http://localhost/api/tracking/${race}/source`,{method:'POST',headers:{origin},body:JSON.stringify(body)}),{params:Promise.resolve({raceId:race})});
+let count=0;const check=(a,b)=>{assert.deepEqual(a,b);count++;};const active={account_status:'active',approval_status:'approved'};const body={action:'save',url:'https://myresult.co.kr/176',code:'10K',enabled:false};
+check((await call(body)).status,401);profile={...active,role:'staff'};check((await call(body)).status,403);profile={...active,role:'admin'};check((await call(body,'https://foreign.test')).status,403);check((await call({...body,url:'https://127.0.0.1/176'})).status,400);check(inspects,0);check(writes,0);
+check((await call(body)).status,200);check(inspects,0);check(writes,1);check((await call({...body,enabled:true})).status,409);check(writes,1);check(inspects,0);
+const inspected=await call({action:'inspect',url:body.url});check(inspected.status,200);check((await inspected.json()).data.credentialsReady,false);
+key=true;check((await call({...body,enabled:true,code:'Full'})).status,400);check((await call({...body,enabled:true})).status,200);check(writes,2);
+event.date='2025-10-25';check((await call({...body,enabled:true})).status,400);
+profile={...active,role:'admin',service_blocked:{liveTracking:true}};check((await call(body)).status,403);
+console.log(`Tracking source API: ${count} authorization, URL, keyless stop/save, credentials and course/date checks passed`);

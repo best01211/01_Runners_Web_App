@@ -1,5 +1,7 @@
 # 대회·종목·그룹과 응원 지점 추적
 
+운영진 선수 등록과 외부 API 연동은 이후 [MyResult 기록 연동](tracking-api-integration.md)으로 확장했다. 이 기능에는 030 마이그레이션이 필요하며 실제 선수 수집은 제공처 API 키 발급 전까지 대기한다.
+
 등록 화면은 이후 [복수 GPX 동시 등록](tracking-multi-course-registration.md)으로 확장했다. 한 번에 여러 종목을 등록하려면 029 마이그레이션까지 적용해야 한다.
 
 ## 사용 방법
