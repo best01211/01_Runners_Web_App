@@ -1,3 +1,4 @@
+import {participationGroupLabel} from "@/lib/participation-groups";
 import {DeleteCancelledSchedule} from "@/components/schedules/delete-cancelled-schedule";
 import {AdminTestParticipationPanel} from "@/components/participation/admin-test-participation";
 import {readAllPages} from "@/lib/query-pagination";
@@ -67,6 +68,14 @@ export default async function ScheduleDetailPage({params}:Props){
       {schedule.status==="cancelled"?<div className="mt-8 rounded-2xl bg-red-50 p-5 text-red-800">취소된 일정입니다.{schedule.cancellation_reason?` 사유: ${schedule.cancellation_reason}`:""}</div>:profile.role==="admin"?<AdminTestParticipationPanel startAt={schedule.start_at} scheduleId={scheduleId} scheduleType={schedule.schedule_type} eventKind={schedule.event_kind} groups={paceGroups} initial={adminTestResult.data} blocked={Boolean(profile.service_blocked?.participation)}/>:schedule.schedule_type==="event"?<EventParticipationPanel scheduleId={scheduleId} canParticipate={canParticipate&&(profile.role!=="guest"||schedule.guest_allowed)} canManage={isStaffOrAdmin(profile)} maintenanceBlocked={Boolean(profile.service_blocked?.participation)}/>:<ParticipationPanel key={`${participation?.participation_id??"none"}:${participation?.pace_group_id??"none"}:${participation?.status??"none"}`} initialGroupCounts={groupCounts} isStaff={isStaffOrAdmin(profile)} maintenanceBlocked={Boolean(profile.service_blocked?.participation)} canChangeGroup={canStartActivity(profile)} scheduleId={scheduleId} scheduleType={schedule.schedule_type} scheduleStatus={schedule.status} participantCount={participantCount??0} capacity={schedule.capacity} capacityExempt={profile.role==="staff"&&!schedule.staff_in_capacity} registrationStartAt={schedule.registration_start_at} registrationEndAt={schedule.registration_end_at} cancellationDeadlineAt={schedule.cancellation_deadline_at} participation={participation} canParticipate={canParticipate} paceGroups={paceGroups??[]} canCreatePaceGroup={isStaffOrAdmin(profile)||(canStartActivity(profile)&&schedule.schedule_type==="flash"&&(canManage||Boolean(participation)))}/>}
       
       {schedule.status==="cancelled"&&profile.role==="admin"&&<DeleteCancelledSchedule scheduleId={scheduleId}/>}
+      {schedule.schedule_type!=="event"&&<section aria-labelledby="group-participants-title" className="mt-8 rounded-2xl border p-5">
+        <h2 id="group-participants-title" className="text-xl font-bold">그룹별 신청자</h2>
+        <div className="mt-4 space-y-4">{[...paceGroups.map(group=>({id:group.pace_group_id,label:participationGroupLabel(group)})),{id:"none",label:paceGroups.length?"그룹 미지정":"자유 참가"}].map(group=>{
+          const members=participants.filter(row=>(row.pace_group_id??"none")===group.id);
+          if(group.id==="none"&&paceGroups.length&&!members.length)return null;
+          return <section key={group.id}><h3 className="font-semibold">{group.label} · {members.length}명</h3>{members.length?<ul className="mt-2 flex flex-wrap gap-2">{members.map(row=><li key={row.participation_id} className="rounded-lg bg-zinc-50 px-3 py-2 text-sm">{(Array.isArray(row.profiles)?row.profiles[0]:row.profiles)?.name??"회원"}{row.user_id===profile.user_id&&" (나)"}</li>)}</ul>:<p className="mt-2 text-sm text-zinc-500">신청자가 없습니다.</p>}</section>;
+        })}</div>
+      </section>}
       <AttendancePanel startAt={schedule.start_at} initialData={initialAttendance} scheduleId={scheduleId} canManage={canManage} eventMode={schedule.schedule_type==="event"} paceGroups={schedule.schedule_type==="event"?[]:paceGroups??[]}/>
       {schedule.comment_enabled&&<CommentPanel initialComments={initialComments} scheduleId={scheduleId} currentUserId={profile.user_id} maintenanceBlocked={Boolean(profile.service_blocked?.comments)} canWrite={canStartActivity(profile)} canNotice={isStaffOrAdmin(profile)}/>}
     </section>
