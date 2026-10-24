@@ -56,7 +56,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData }: { sche
   document.addEventListener("visibilitychange", visible);
   return () => { mounted.current = false; activeRequest.current?.abort(); activeRequest.current = null; clearInterval(poll); clearInterval(tick); document.removeEventListener("visibilitychange", visible); };
  }, [load,initialData]);
- const automatic=!!(data?.timing?.enabled&&data.timing.credentialsReady&&data.timing.courseCode);
+ const automatic=!!(data?.timing?.enabled&&(data.timing.collectionMode==="public-page"||data.timing.credentialsReady)&&data.timing.courseCode);
  useEffect(()=>{
   if(!automatic)return;let disposed=false,active:AbortController|null=null;
   const sync=async()=>{if(document.visibilityState!=="visible"||active)return;const controller=new AbortController();active=controller;const timeout=setTimeout(()=>controller.abort(),55000);
@@ -82,7 +82,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData }: { sche
   {error && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">{error}{data && " 마지막 수신 위치를 유지하고 있습니다."}</p>}
   {data && !course && <p className="rounded-2xl border p-5">코스가 아직 등록되지 않았습니다. 운영진이 공식 거리와 코스 파일을 등록하면 추적이 시작됩니다.</p>}
   {course && data && <LiveTrackingView key={data.raceId??scheduleId} data={data} course={course} states={states} selectedId={selection} onSelect={setSelection} now={now}/> }
-  {data?.timing&&<p role="status" className="rounded-xl border border-zinc-200 p-3 text-xs leading-5">기록 연동: {!data.timing.credentialsReady?"API 인증 설정 필요":!data.timing.enabled?"중지":!data.timing.courseCode?"현재 종목 연결 필요":data.timing.status==="synced"?"수집 응답 확인":data.timing.status==="partial"?"일부 기록 확인 필요":data.timing.status==="auth-required"?"API 인증 오류":data.timing.status==="rate-limit"?"제공처 요청 제한":data.timing.status==="error"?"연결 확인 필요":"계측 수집 대기"}{data.timing.lastSyncedAt&&` · 최근 수집 ${new Date(data.timing.lastSyncedAt).toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul"})}`}</p>}
+  {data?.timing&&<p role="status" className="rounded-xl border border-zinc-200 p-3 text-xs leading-5">기록 연동{data.timing.collectionMode==="public-page"?" · 공개 페이지":""}: {data.timing.collectionMode!=="public-page"&&!data.timing.credentialsReady?"API 인증 설정 필요":!data.timing.enabled?"중지":!data.timing.courseCode?"현재 종목 연결 필요":data.timing.status==="synced"?"수집 응답 확인":data.timing.status==="partial"?"일부 기록 확인 필요":data.timing.status==="auth-required"?"기록 페이지 접근 제한":data.timing.status==="rate-limit"?"제공처 요청 제한":data.timing.status==="error"?"연결 확인 필요":"계측 수집 대기"}{data.timing.lastSyncedAt&&` · 최근 수집 ${new Date(data.timing.lastSyncedAt).toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul"})}`}</p>}
   {data?.canManage&&<TimingSourcePanel key={`${data.timing?.sourceUrl??""}:${data.timing?.courseCode??""}`} raceId={scheduleId} timing={data.timing} onSaved={load}/>}
   {data?.canManage && <section aria-label="실제 추적 준비 상태" className="rounded-2xl border border-zinc-200 bg-white p-4">
    <h2 className="text-sm font-bold">실제 추적 준비 상태</h2>
@@ -92,7 +92,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData }: { sche
     <li className="rounded-xl bg-zinc-50 p-3">{Object.values(data.checkpoints).some(records => records.length) ? "✓" : "○"} 계측 기록 {Object.values(data.checkpoints).reduce((sum, records) => sum + records.length, 0)}개</li>
    </ul>
    <p className="mt-3 text-xs leading-5 text-zinc-600">{!data.runners.length ? "다음 단계: 아래 관리자 메뉴에서 실제 참가자와 배번호를 등록해주세요." : !Object.values(data.checkpoints).some(records => records.length) ? "다음 단계: 실제 확인한 START 또는 계측소 통과 기록을 입력해주세요. 현재 위치는 예정 출발과 그룹 페이스 기준입니다." : "계측 기록이 연결되어 있습니다. 다른 기기에서 최근 계측 기록이 반영되는지 확인해주세요."}</p>
-   <p className="mt-2 text-xs leading-5 text-zinc-500">화면 기록은 15초마다 갱신 · 외부 수집은 인증·종목 연결 후 동작 · GPS 위치 아님</p>
+   <p className="mt-2 text-xs leading-5 text-zinc-500">화면 기록은 15초마다 갱신 · 공개 기록 자동 수집은 종목 연결 후 동작 · GPS 위치 아님</p>
   </section>}
   {data?.canManage && data.eventId && <details className="rounded-2xl border border-zinc-200 p-4"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">같은 대회에 종목 추가</summary><p className="text-sm text-zinc-500">종목마다 별도의 거리·출발 시간·GPX를 등록합니다.</p><RaceRegistrationForm parentRaceId={data.eventId} eventName={data.title}/></details>}
 

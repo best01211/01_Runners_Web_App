@@ -47,7 +47,7 @@ export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile)
  }
  const snapshot: RaceSnapshot = {
   canRegisterEntries,
-  ...(sourceResult.data?{timing:{sourceUrl:sourceResult.data.source_url,courseCode:course.timing_course_code,enabled:sourceResult.data.enabled,credentialsReady:!!timingCredentials(myResultSource(sourceResult.data.source_url).id),lastSyncedAt:syncResult.data?.last_synced_at??null,status:!sourceResult.data.enabled?"disabled":!timingCredentials(myResultSource(sourceResult.data.source_url).id)?"auth-required":syncResult.data?.status??"ready",message:syncResult.data?.message??""}}:{}),
+  ...(sourceResult.data?{timing:{collectionMode:"public-page",sourceUrl:sourceResult.data.source_url,courseCode:course.timing_course_code,enabled:sourceResult.data.enabled,credentialsReady:!!timingCredentials(myResultSource(sourceResult.data.source_url).id),lastSyncedAt:syncResult.data?.last_synced_at??null,status:!sourceResult.data.enabled?"disabled":syncResult.data?.status??"ready",message:syncResult.data?.message??""}}:{}),
   raceId,eventId,courses:(siblings.data??[]).map(c=>({raceId:c.race_id,name:c.course_name,distanceMeters:c.distance_meters,startAt:c.start_at})),
   groups:groups.map(g=>({groupId:g.group_id,name:g.name,paceSeconds:g.pace_seconds})),
   serverNow: new Date().toISOString(), title: course.name, currentUserId: profile.user_id, canManage: canManage, courseLocked: Boolean(entries?.length),

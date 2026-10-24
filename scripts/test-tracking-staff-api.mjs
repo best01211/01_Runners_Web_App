@@ -31,13 +31,21 @@ profile={role:'admin',account_status:'active',approval_status:'approved'};check(
 
 const event=provider.parseTimingEvent({id:176,date:'2026-10-25',name:'대회',courses:[{course_cd:'10K',distance:'10',points:[{point_cd:'P0',lap:1,name:'출발',distance:'0'},{point_cd:'P1',lap:1,name:'5K',distance:'5'}]}]},'176');
 let key=false,requests=0,applies=[];
+const require=Module.createRequire(import.meta.url);
+const publicProvider=compile('src/lib/race-tracking/myresult-public.ts',id=>id==='cheerio'?require('cheerio'):provider);
+const publicHTML=()=>'<div class="ant-card"><div class="ant-card-meta-title">대회</div><div class="ant-card-meta-description">2026-10-25</div></div><div class="card-player"><span class="ant-avatar-string">10K</span><div class="ant-card-meta-description">남자 | #123</div></div><div class="table-header"><div>구간명</div><div>통과시간</div><div>구간기록</div><div>누적기록</div></div><div class="table-row"><div>출발</div><div>'+(key?'09:00:00':'?')+'</div><div>-</div><div>-</div></div><div class="table-row"><div>5K</div><div>'+(key?'09:30:00':'?')+'</div><div>-</div><div>-</div></div>';
 const syncClient={rpc:async(fn,args)=>fn==='claim_tracking_sync'?{data:{url:'https://myresult.co.kr/176',code:'10K',token:'lease',version:'version',cursor:null},error:null}:(applies.push(args),{error:null}),from:table=>table==='tracking_races'?{select:()=>({eq:()=>({single:async()=>({data:{distance_meters:10000,start_at:'2026-10-25T09:00:00+09:00'},error:null})})})}:(()=>{const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,gt:()=>q,then:resolve=>Promise.resolve({data:[{entry_id:user,bib:'00123'}],error:null}).then(resolve)};return q;})()};
 const {synchronizeTracking}=compile('src/lib/race-tracking/sync-server.ts',id=>{
  if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>syncClient};
  if(id==='./myresult')return provider;
+ if(id==='./myresult-public')return {fetchPublicTimingHTML:async()=>{requests++;return publicHTML();},parsePublicTimingPlayer:publicProvider.parsePublicTimingPlayer};
  if(id==='./myresult-server')return {timingCredentials:()=>key?{'X-Fixture':'fixture'}:null,inspectTimingSource:async()=>event,fetchTimingJSON:async()=>{requests++;return {event_id:176,course_cd:'10K',num:123,records:[]};}};
  throw Error(id);
 });
-check((await synchronizeTracking(race)).status,'auth-required');check(requests,0);check(applies[0].records,[]);
-key=true;check((await synchronizeTracking(race)).status,'synced');check(requests,1);check(applies[1].token,'lease');check(applies[1].source_version,'version');
+const realNow=Date.now;Date.now=()=>Date.parse('2026-10-25T10:00:00+09:00');
+try{
+check((await synchronizeTracking(race)).status,'synced');check(requests,1);check(applies[0].records,[]);
+key=true;check((await synchronizeTracking(race)).status,'synced');check(requests,2);check(applies[1].token,'lease');check(applies[1].source_version,'version');
+check(applies[1].records.map(r=>r.distanceMeters),[0,5000]);
+}finally{Date.now=realNow;}
 console.log(`Tracking staff API and sync orchestration: ${count} checks passed`);

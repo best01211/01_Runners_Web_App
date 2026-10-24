@@ -1,5 +1,6 @@
+import {fetchPublicTimingHTML,parsePublicTimingPlayer} from './myresult-public';
 import {createSupabaseAdminClient} from '@/lib/supabase/admin';
-import {fetchTimingJSON,inspectTimingSource,timingCredentials} from './myresult-server';
+import {inspectTimingSource} from './myresult-server';
 import {myResultSource,parseTimingPlayer,TimingError} from './myresult';
 export async function synchronizeTracking(raceId:string){
  const admin=createSupabaseAdminClient();
@@ -10,8 +11,6 @@ export async function synchronizeTracking(raceId:string){
  const records:ReturnType<typeof parseTimingPlayer>=[];
  try{
   const source=myResultSource(lease.url);
-  const credentials=timingCredentials(source.id);
-  if(!credentials)throw new TimingError('AUTH_REQUIRED','MyResult에서 발급한 API 키와 인증 헤더 설정이 필요합니다.');
   const event=await inspectTimingSource(source.url);
   const {data:course,error:courseError}=await admin.from('tracking_races').select('distance_meters,start_at').eq('race_id',raceId).single();
   if(courseError||!course)throw new Error('DATABASE_ERROR');
@@ -25,12 +24,12 @@ export async function synchronizeTracking(raceId:string){
   const candidates=entries??[];let index=0,stop=false;const failures=new Set<string>();
   await Promise.all(Array.from({length:Math.min(4,candidates.length)},async()=>{
    while(index<candidates.length&&!stop){const entry=candidates[index++];
-    try{const response=await fetchTimingJSON(`${source.api}/player/${encodeURIComponent(entry.bib)}`,credentials);
-     records.push(...parseTimingPlayer(response,event,lease.code,entry.bib,entry.entry_id,course.distance_meters,course.start_at,Date.now()));
+    try{const response=await fetchPublicTimingHTML(source.url,entry.bib);
+     records.push(...parsePublicTimingPlayer(response,event,lease.code,entry.bib,entry.entry_id,course.distance_meters,course.start_at,Date.now()));
     }catch(e){const code=e instanceof TimingError?e.code:'UPSTREAM_ERROR';failures.add(code);if(['AUTH_REQUIRED','RATE_LIMIT'].includes(code))stop=true;}
    }
   }));
-  if(failures.size){status=failures.has('AUTH_REQUIRED')?'auth-required':failures.has('RATE_LIMIT')?'rate-limit':'partial';message=failures.has('AUTH_REQUIRED')?'MyResult API 키 또는 인증 방식 확인이 필요합니다.':failures.has('RATE_LIMIT')?'기록 제공처의 요청 제한으로 잠시 대기합니다.':'일부 배번호의 대회·종목·기록 또는 연결 상태를 확인해주세요.';}
+  if(failures.size){status=failures.has('AUTH_REQUIRED')?'auth-required':failures.has('RATE_LIMIT')?'rate-limit':'partial';message=failures.has('AUTH_REQUIRED')?'공개 기록 페이지 접근이 제한되었습니다.':failures.has('RATE_LIMIT')?'기록 제공처의 요청 제한으로 잠시 대기합니다.':'일부 배번호의 대회·종목·기록 또는 연결 상태를 확인해주세요.';}
   cursor=stop?lease.cursor??null:candidates.length===40?candidates.at(-1)!.entry_id:null;
  }catch(e){status=e instanceof TimingError&&e.code==='AUTH_REQUIRED'?'auth-required':'error';message=e instanceof TimingError?e.message:'기록 제공처 연결 또는 데이터 확인이 필요합니다.';cursor=lease.cursor??null;}
  const {error:applyError}=await admin.rpc('apply_tracking_sync',{target_race:raceId,token:lease.token,source_version:lease.version,records,next_cursor:cursor,sync_status:status,sync_message:message});

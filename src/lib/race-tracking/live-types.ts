@@ -10,5 +10,5 @@ export type RaceSnapshot = {
  courses?: { raceId: string; name: string; distanceMeters: number; startAt: string }[];
  groups?: { groupId: string; name: string; paceSeconds: number }[];
  canRegisterEntries?: boolean;
- timing?: {credentialsReady:boolean;sourceUrl:string;courseCode:string;enabled:boolean;lastSyncedAt:string|null;status:string;message:string};
+ timing?: {collectionMode?:"public-page";credentialsReady:boolean;sourceUrl:string;courseCode:string;enabled:boolean;lastSyncedAt:string|null;status:string;message:string};
 };

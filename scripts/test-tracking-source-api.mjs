@@ -13,9 +13,9 @@ const {POST}=compile('src/app/api/tracking/[raceId]/source/route.ts',id=>{
 const call=(body,origin='http://localhost')=>POST(new Request(`http://localhost/api/tracking/${race}/source`,{method:'POST',headers:{origin},body:JSON.stringify(body)}),{params:Promise.resolve({raceId:race})});
 let count=0;const check=(a,b)=>{assert.deepEqual(a,b);count++;};const active={account_status:'active',approval_status:'approved'};const body={action:'save',url:'https://myresult.co.kr/176',code:'10K',enabled:false};
 check((await call(body)).status,401);profile={...active,role:'staff'};check((await call(body)).status,403);profile={...active,role:'admin'};check((await call(body,'https://foreign.test')).status,403);check((await call({...body,url:'https://127.0.0.1/176'})).status,400);check(inspects,0);check(writes,0);
-check((await call(body)).status,200);check(inspects,0);check(writes,1);check((await call({...body,enabled:true})).status,409);check(writes,1);check(inspects,0);
-const inspected=await call({action:'inspect',url:body.url});check(inspected.status,200);check((await inspected.json()).data.credentialsReady,false);
-key=true;check((await call({...body,enabled:true,code:'Full'})).status,400);check((await call({...body,enabled:true})).status,200);check(writes,2);
+check((await call(body)).status,200);check(inspects,0);check(writes,1);check((await call({...body,enabled:true})).status,200);check(writes,2);check(inspects,1);
+const inspected=await call({action:'inspect',url:body.url});check(inspected.status,200);const inspectedData=(await inspected.json()).data;check(inspectedData.credentialsReady,false);check(inspectedData.collectionMode,'public-page');
+key=true;check((await call({...body,enabled:true,code:'Full'})).status,400);check((await call({...body,enabled:true})).status,200);check(writes,3);
 event.date='2025-10-25';check((await call({...body,enabled:true})).status,400);
 profile={...active,role:'admin',service_blocked:{liveTracking:true}};check((await call(body)).status,403);
 console.log(`Tracking source API: ${count} authorization, URL, keyless stop/save, credentials and course/date checks passed`);
