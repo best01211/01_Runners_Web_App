@@ -12,7 +12,7 @@ writeFileSync(path.join(dir,'fixture.tsx'),`import React from 'react';import{cre
 await build({entryPoints:[path.join(dir,'fixture.tsx')],outfile:path.join(dir,'bundle.js'),bundle:true,format:'esm',jsx:'automatic',loader:{'.png':'dataurl'},define:{'process.env.NODE_ENV':'"development"'},plugins:[{name:'next-fixture',setup(b){b.onResolve({filter:/^next\/(dynamic|link|navigation)$/},a=>({path:a.path,namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},a=>({loader:'jsx',resolveDir:process.cwd(),contents:a.path==='next/navigation'?`export function useRouter(){return {push(url){window.__push=url},refresh(){},replace(){}}}`:a.path==='next/link'?`import React from 'react';export default function Link({children,...props}){return <a {...props}>{children}</a>}`:`import React,{useEffect,useState}from'react';export default function dynamic(load,options){return function Dynamic(props){const[C,set]=useState(null);useEffect(()=>{let live=true;load().then(m=>{if(live)set(()=>m.default)});return()=>{live=false}},[]);return C?<C {...props}/>:<options.loading/>}}`}));}}]});
 const css=await postcss([tailwind()]).process(readFileSync('src/app/globals.css','utf8'),{from:path.resolve('src/app/globals.css')});
 writeFileSync(path.join(dir,'styles.css'),css.css);
-writeFileSync(path.join(dir,'index.html'),'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/bundle.css"><div id="root"></div><script type="module" src="/bundle.js"></script>');
+writeFileSync(path.join(dir,'index.html'),'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/bundle.css"><div class="app-shell"><div id="root"></div></div><script type="module" src="/bundle.js"></script>');
 const allowed=['index.html','bundle.js','bundle.css','styles.css'];
 const server=createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;const f=pathname==='/'?'index.html':pathname.slice(1);if(!allowed.includes(f)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(readFileSync(path.join(dir,f)));});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
@@ -23,6 +23,7 @@ try{
  await page.route('https://tile.openstreetmap.org/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#eef0ed"/></svg>'}));
  await page.goto(`http://127.0.0.1:${server.address().port}`);
  await page.getByRole('heading',{name:'선수 현황 · 하프'}).waitFor();
+ const activePane=page.getByRole('button',{name:'대회 현황',exact:true});assert.equal(await activePane.getAttribute('aria-pressed'),'true');assert.equal(await activePane.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(34, 38, 31)');assert.equal(await page.getByRole('link',{name:'하프 · 21.0975km',exact:true}).getAttribute('aria-current'),'page');
  await page.getByText('그룹 페이스 기준',{exact:false}).first().waitFor();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.screenshot({path:path.join(dir,'01-overview-mobile.png'),fullPage:true});
@@ -38,7 +39,7 @@ try{
  await page.getByRole('slider',{name:'가상 대회 진행 시각'}).fill('2100');
  await page.getByRole('button',{name:'선수 기록',exact:true}).click();
  await page.getByText('실제 계측 기반',{exact:false}).first().waitFor();
- await page.getByRole('button',{name:'10K',exact:true}).click();
+ await page.getByRole('link',{name:'10K · 10km',exact:true}).click();
  await page.getByRole('heading',{name:'선수 현황 · 10K'}).waitFor();
  await page.setViewportSize({width:1280,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.screenshot({path:path.join(dir,'04-overview-desktop.png'),fullPage:true});
