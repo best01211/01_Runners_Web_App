@@ -31,7 +31,11 @@ profile={...profile,service_blocked:{},withdrawal_pending:true};check((await cal
 profile={role:'admin',account_status:'active',approval_status:'approved'};check((await call({action:'group',name:'B',paceSeconds:300})).status,200);
 check(writes[0].args.payload.runnerName,'홍길동');
 check((await call({...entry,runnerName:'가짜 이름'})).status,200);
-check(writes.at(-1).args.payload.runnerName,'홍길동');
+check(writes.at(-1).args.payload.runnerName,'가짜 이름');
+check(writes.at(-1).args.payload.userId,undefined);
+memberName=null;check((await call({action:'entry',runnerName:'직접 입력',bib:'3987',groupId:group,targetPaceSeconds:null})).status,200);
+check(writes.at(-1).args.payload.runnerName,'직접 입력');
+check((await call({action:'entry',runnerName:' ',bib:'3987',groupId:group,targetPaceSeconds:null})).status,400);
 const validWrites=writes.length;
 memberName=' ';check((await call()).status,409);
 memberName=null;check((await call()).status,409);
@@ -40,10 +44,10 @@ check(writes.length,validWrites);memberLookupError=null;
 
 const snapshotClient={from:table=>{const results={
  profiles:[{user_id:user,name:'홍길동',nickname:'andy01'}],
- tracking_race_entries:[{entry_id:user,user_id:user,bib:'00123',group_id:group,target_pace_seconds:300,status:'running'}],
+ tracking_race_entries:[{entry_id:user,user_id:user,runner_name:'홍길동',bib:'00123',group_id:group,target_pace_seconds:300,status:'running'},{entry_id:group,user_id:null,runner_name:'외부 선수',bib:'3987',group_id:group,target_pace_seconds:300,status:'running'}],
  tracking_races:[{race_id:race,name:'대회',course_name:'10K',distance_meters:10000,start_at:'2026-10-25T09:00:00+09:00',status:'active',parent_race_id:null,points:[]}],
  tracking_pace_groups:[{group_id:group,name:'B',pace_seconds:300}],
- tracking_checkpoints:[],tracking_timing_sources:[],tracking_timing_sync:[],
+ tracking_checkpoints:[{checkpoint_id:race,entry_id:group,name:'START',distance_meters:0,passed_at:'2026-10-25T00:05:58Z',received_at:'2026-10-25T00:42:00Z',source:'myresult'}],tracking_timing_sources:[],tracking_timing_sync:[],
  };const result={data:results[table],error:null};const q={select:()=>q,eq:()=>q,neq:()=>q,in:()=>q,or:()=>q,order:()=>q,limit:()=>q,range:()=>q,maybeSingle:async()=>({...result,data:result.data[0]??null}),then:resolve=>Promise.resolve(result).then(resolve)};return q;}};
 const {loadTrackingSnapshot}=compile('src/lib/tracking-snapshot-server.ts',id=>{
  if(id==='@/lib/auth/account-access')return access;
@@ -53,8 +57,13 @@ const {loadTrackingSnapshot}=compile('src/lib/tracking-snapshot-server.ts',id=>{
  throw Error(id);
 });
 const snapshot=await loadTrackingSnapshot(race,profile);
-check(snapshot.participants,[{userId:user,name:'홍길동'}]);
+check(snapshot.participants,[]);
+check(snapshot.runners[1].name,'외부 선수');
+check(snapshot.checkpoints[group][0].name,'START');
 check(snapshot.runners[0].name,'홍길동');
+const memberSnapshot=await loadTrackingSnapshot(race,{...profile,role:'member'});
+check(memberSnapshot.runners.map(r=>r.bib),['00123','3987']);
+check(memberSnapshot.entries,[]);
 
 const event=provider.parseTimingEvent({id:176,date:'2026-10-25',name:'대회',courses:[{course_cd:'10K',distance:'10',points:[{point_cd:'P0',lap:1,name:'출발',distance:'0'},{point_cd:'P1',lap:1,name:'5K',distance:'5'}]}]},'176');
 let key=false,requests=0,applies=[];

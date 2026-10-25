@@ -3,6 +3,13 @@ import { test } from "node:test";
 import { validateRaceWrite } from "../../src/lib/race-tracking/validation";
 const id = "22222222-2222-4222-8222-222222222222";
 const course = { action:"course", name:"서울레이스", distanceMeters:42195, startAt:"2026-10-11T08:00:00+09:00", points:[{latitude:37.5,longitude:127},{latitude:37.51,longitude:127.01}] };
+test("registers a typed runner name without a member account",()=>{
+ const input={action:"entry",runnerName:"  외부 선수  ",bib:"003987",groupId:id,targetPaceSeconds:null};
+ assert.deepEqual(validateRaceWrite(input),{action:"entry",runnerName:"외부 선수",bib:"003987",groupId:id,targetPaceSeconds:null});
+ for(const runnerName of ["", " ", "가".repeat(51), "이름\n입력", null, 123])assert.throws(()=>validateRaceWrite({...input,runnerName}));
+ assert.throws(()=>validateRaceWrite({...input,entryId:"fake"}));
+ assert.equal((validateRaceWrite({...input,entryId:id}) as {entryId:string}).entryId,id);
+});
 test("course normalizes timezone and strips additional coordinate fields",()=> {
  const result = validateRaceWrite({...course, points:course.points.map(p=>({...p, email:"ignored"}))});
  assert.equal(result.action,"course");

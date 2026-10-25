@@ -4,7 +4,7 @@ export type RaceSnapshot = {
  course: { name: string; distanceMeters: number; points: Coordinate[]; startAt: string } | null;
  runners: Runner[]; checkpoints: Record<string, Checkpoint[]>;
  participants: { userId: string; name: string }[];
- entries: { entryId: string; userId: string; bib: string }[];
+ entries: { entryId: string; userId: string | null; bib: string }[];
  raceId?: string;
  eventId?: string;
  courses?: { raceId: string; name: string; distanceMeters: number; startAt: string }[];

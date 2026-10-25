@@ -53,7 +53,7 @@ const errors: Record<string, string> = {
  RACE_FORBIDDEN: "변경 권한이 없습니다.", RACE_NOT_FOUND: "진행 가능한 이벤트가 아닙니다.",
  COURSE_LOCKED: "선수가 등록된 코스는 변경할 수 없습니다.", COURSE_REQUIRED: "먼저 코스를 등록해주세요.",
  NOT_PARTICIPANT: "승인된 활성 회원만 출전 등록할 수 있습니다.", ENTRY_LOCKED: "출발 이후 또는 계측 기록이 있는 선수 정보는 수정할 수 없습니다.",
- INVALID_RUNNER_NAME: "회원 이름을 확인해주세요. 이름이 등록된 회원만 출전 등록할 수 있습니다.",
+ INVALID_RUNNER_NAME: "선수 이름을 1~50자로 입력해주세요.",
  ENTRY_NOT_FOUND: "선수를 찾을 수 없습니다.", STATUS_LOCKED: "완주·미출발·중도 포기 상태와 계측 기록을 확인해주세요.",
  INVALID_CHECKPOINT: "코스 거리·대회 출발 시각을 확인해주세요. 미래 통과 시각은 입력할 수 없습니다.",
  CHECKPOINT_ORDER: "이미 기록한 거리보다 먼 지점과 늦은 시각을 입력해주세요.",
@@ -71,8 +71,8 @@ export async function POST(request: Request, { params }: Context) {
  if (write.action==="entry"?!canRegisterTrackingEntries(c.profile):!c.canManage) return fail("FORBIDDEN", "해당 추적 정보를 변경할 권한이 없습니다.", 403);
  // Use the selected member's real name, never a client-supplied name or login ID.
  let payload: typeof write & { runnerName?: string } = write;
- if (write.action === "entry") {
-  const { data: member, error: memberError } = await c.admin.from("profiles").select("name").eq("user_id", write.userId).eq("account_status", "active").eq("approval_status", "approved").maybeSingle();
+ if (write.action === "entry" && !write.runnerName) {
+  const { data: member, error: memberError } = await c.admin.from("profiles").select("name").eq("user_id", write.userId!).eq("account_status", "active").eq("approval_status", "approved").maybeSingle();
   if (memberError) return databaseFailure(memberError.code);
   if (!member) return fail("NOT_PARTICIPANT", errors.NOT_PARTICIPANT, 409);
   const runnerName = member.name?.trim();

@@ -8,11 +8,10 @@ import type {Checkpoint} from "@/lib/race-tracking/types";
 export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile):Promise<RaceSnapshot>{
  if(!canUseService(profile)||profile.service_blocked?.liveTracking)throw new Error("FORBIDDEN");
  const admin=createSupabaseAdminClient(),canManage=canAdminister(profile),canRegisterEntries=canRegisterTrackingEntries(profile);
- let profileQuery=admin.from("profiles").select("user_id,name").eq("account_status","active").eq("approval_status","approved").order("name").order("user_id");
- if(profile.role!=="admin")profileQuery=profileQuery.neq("role","admin");
- const [courseResult,entryResult,managerProfiles]=await Promise.all([
+ const profileQuery=admin.from("profiles").select("user_id,name").eq("account_status","active").eq("approval_status","approved").order("name").order("user_id");
+ const [courseResult,entryResult]=await Promise.all([
   admin.from("tracking_races").select("name,status,distance_meters,points,start_at,parent_race_id,course_name,timing_course_code").eq("race_id",raceId).maybeSingle(),
-  admin.from("tracking_race_entries").select("entry_id,user_id,bib,target_pace_seconds,status,group_id").eq("race_id",raceId).limit(501),
+  admin.from("tracking_race_entries").select("entry_id,user_id,runner_name,bib,target_pace_seconds,status,group_id").eq("race_id",raceId).limit(501),
   canRegisterEntries?profileQuery.limit(500):Promise.resolve(null),
  ]);
  if(courseResult.error||entryResult.error)throw new Error("DATABASE_ERROR");
@@ -20,11 +19,11 @@ export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile)
  if(!course||course.status!=="active")throw new Error("NOT_FOUND");
  if((entries?.length??0)>500)throw new Error("CAPACITY_LIMIT");
  const eventId=course.parent_race_id??raceId;
- const ids=(entries??[]).map(e=>e.user_id);
+ const ids=(entries??[]).map(e=>e.user_id).filter((id): id is string => Boolean(id));
  const [siblings,groupResult,profileResult,sourceResult,syncResult]=await Promise.all([
   admin.from("tracking_races").select("race_id,course_name,distance_meters,start_at,status").or(`race_id.eq.${eventId},parent_race_id.eq.${eventId}`).eq("status","active").order("distance_meters",{ascending:false}),
   admin.from("tracking_pace_groups").select("group_id,name,pace_seconds").eq("race_id",raceId).order("pace_seconds"),
-  managerProfiles??profileQuery.in("user_id",ids.length?ids:["00000000-0000-0000-0000-000000000000"]).limit(500),
+  profileQuery.in("user_id",ids.length?ids:["00000000-0000-0000-0000-000000000000"]).limit(500),
   admin.from("tracking_timing_sources").select("source_url,enabled").eq("race_id",eventId).maybeSingle(),
   admin.from("tracking_timing_sync").select("status,message,last_synced_at").eq("race_id",raceId).maybeSingle(),
  ]);
@@ -34,7 +33,7 @@ export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile)
  const {data:profiles,error:profileError}=profileResult;
  if(profileError)throw new Error("DATABASE_ERROR");
  const eligible=new Map((profiles??[]).map(p=>[p.user_id,p]));
- const visibleEntries=(entries??[]).filter(e=>eligible.has(e.user_id));
+ const visibleEntries=(entries??[]).filter(e=>e.user_id ? eligible.has(e.user_id) : Boolean(e.runner_name?.trim()));
  const checkpointMap: Record<string, Checkpoint[]> = {};
  // Each runner has a bounded checkpoint count. Paging avoids Supabase's default row cap.
  if (visibleEntries.length) {
@@ -52,9 +51,9 @@ export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile)
   groups:groups.map(g=>({groupId:g.group_id,name:g.name,paceSeconds:g.pace_seconds})),
   serverNow: new Date().toISOString(), title: course.name, currentUserId: profile.user_id, canManage: canManage, courseLocked: Boolean(entries?.length),
   course: course ? { name: course.course_name, distanceMeters: course.distance_meters, points: course.points, startAt: course.start_at } : null,
-  participants: [...eligible.values()].filter(() => canRegisterEntries).map(p => ({ userId: p.user_id, name: p.name })),
+  participants: [],
   entries: visibleEntries.filter(() => canRegisterEntries).map(e => ({ entryId: e.entry_id, userId: e.user_id, bib: e.bib })),
-  runners: visibleEntries.map(e => ({ id: e.entry_id, name: eligible.get(e.user_id)!.name, bib: e.bib, startAt: course!.start_at, groupName:groups.find(g=>g.group_id===e.group_id)?.name, groupPaceSeconds:groups.find(g=>g.group_id===e.group_id)?.pace_seconds, useGroupPrediction:!!e.group_id, targetPaceSeconds: e.target_pace_seconds ?? undefined, status: e.status })),
+  runners: visibleEntries.map(e => ({ id: e.entry_id, name: e.runner_name?.trim() || eligible.get(e.user_id)!.name, bib: e.bib, startAt: course!.start_at, groupName:groups.find(g=>g.group_id===e.group_id)?.name, groupPaceSeconds:groups.find(g=>g.group_id===e.group_id)?.pace_seconds, useGroupPrediction:!!e.group_id, targetPaceSeconds: e.target_pace_seconds ?? undefined, status: e.status })),
   checkpoints: checkpointMap,
  };
  return snapshot;
