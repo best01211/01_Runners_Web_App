@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCourse, courseFromGeoJSON, distanceBetween, positionAtDistance } from "../../src/lib/race-tracking/course";
 import { initialPace, trackRunner } from "../../src/lib/race-tracking/engine";
+import {trackingStatusLabel} from "../../src/lib/race-tracking/status-label";
 import { DEMO_START, DEMO_COURSE, MockTimingProvider } from "../../src/lib/race-tracking/providers/mock";
 import type { Checkpoint, Runner } from "../../src/lib/race-tracking/types";
 
@@ -15,6 +16,17 @@ const checkpoint = (distance: number, seconds: number, delay = 0): Checkpoint =>
 const track = (records: Checkpoint[], seconds: number, override: Partial<Runner> = {}) =>
   trackRunner({ ...runner, ...override }, records, course, start + seconds * 1000);
 const near = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 0.001, `${actual} != ${expected}`);
+test("late registration recovers from initial waiting when historical checkpoints arrive",()=>{
+ const waiting=track([],7200);
+ assert.equal(waiting.status,'stale');
+ assert.equal(trackingStatusLabel(waiting),'첫 계측 수집 대기');
+ const recovered=track([checkpoint(0,0,7200),checkpoint(10000,3600,3600),checkpoint(15000,6600,600)],7200);
+ assert.equal(recovered.status,'running');assert.equal(recovered.paceSource,'timing');
+ assert.equal(recovered.lastCheckpoint?.distanceMeters,15000);
+ const mismatch={...waiting,runner:{...waiting.runner,timingStatus:'error',timingErrorCode:'COURSE_MISMATCH'}};
+ assert.equal(trackingStatusLabel(mismatch),'종목 확인 필요');
+ assert.equal(trackingStatusLabel({...recovered,runner:{...recovered.runner,timingStatus:'synced'}}),'달리는 중 · 예측');
+});
 
 test("Haversine distance and official-distance mapping", () => {
   near(distanceBetween({ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 0 }), 0);

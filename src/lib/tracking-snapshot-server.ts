@@ -11,7 +11,7 @@ export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile)
  const profileQuery=admin.from("profiles").select("user_id,name").eq("account_status","active").eq("approval_status","approved").order("name").order("user_id");
  const [courseResult,entryResult]=await Promise.all([
   admin.from("tracking_races").select("name,status,distance_meters,points,start_at,parent_race_id,course_name,timing_course_code").eq("race_id",raceId).maybeSingle(),
-  admin.from("tracking_race_entries").select("entry_id,user_id,runner_name,bib,target_pace_seconds,status,group_id").eq("race_id",raceId).is("deleted_at",null).limit(501),
+  admin.from("tracking_race_entries").select("entry_id,user_id,runner_name,bib,target_pace_seconds,status,group_id,timing_checked_at,timing_status,timing_error_code,timing_message,provider_course_code").eq("race_id",raceId).is("deleted_at",null).limit(501),
  ]);
  if(courseResult.error||entryResult.error)throw new Error("DATABASE_ERROR");
  const course=courseResult.data,entries=entryResult.data;
@@ -58,7 +58,7 @@ export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile)
   course: course ? { name: course.course_name, distanceMeters: course.distance_meters, points: course.points, startAt: course.start_at } : null,
   participants: [],
   entries: visibleEntries.filter(() => canRegisterEntries).map(e => ({ entryId: e.entry_id, userId: e.user_id, bib: e.bib })),
-  runners: visibleEntries.map(e => ({ id: e.entry_id, name: e.runner_name?.trim() || eligible.get(e.user_id)!.name, bib: e.bib, startAt: course!.start_at, groupName:groups.find(g=>g.group_id===e.group_id)?.name, groupPaceSeconds:groups.find(g=>g.group_id===e.group_id)?.pace_seconds, useGroupPrediction:!!e.group_id, targetPaceSeconds: e.target_pace_seconds ?? undefined, status: e.status })),
+  runners: visibleEntries.map(e => ({ id: e.entry_id, name: e.runner_name?.trim() || eligible.get(e.user_id)!.name, bib: e.bib, startAt: course!.start_at, groupName:groups.find(g=>g.group_id===e.group_id)?.name, groupPaceSeconds:groups.find(g=>g.group_id===e.group_id)?.pace_seconds, useGroupPrediction:!!e.group_id, targetPaceSeconds: e.target_pace_seconds ?? undefined, status: e.status,timingCheckedAt:e.timing_checked_at,timingStatus:e.timing_status,timingErrorCode:e.timing_error_code,timingMessage:e.timing_message,providerCourseCode:e.provider_course_code })),
   checkpoints: checkpointMap,
  };
  return snapshot;

@@ -8,6 +8,7 @@ import type { FormEvent } from "react";
 import { buildCourse, courseFromGeoJSON, courseFromGPX } from "@/lib/race-tracking/course";
 import {nextTrackingRefresh,canRefreshTracking} from "@/lib/race-tracking/refresh-policy";
 import { trackRunner } from "@/lib/race-tracking/engine";
+import {trackingStatusLabel} from "@/lib/race-tracking/status-label";
 import type { RaceSnapshot } from "@/lib/race-tracking/live-types";
 import type { RaceWrite } from "@/lib/race-tracking/validation";
 import type { TrackingState, Coordinate } from "@/lib/race-tracking/types";
@@ -132,8 +133,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
 }
 
 function RunnerStatusList({states}:{states:TrackingState[]}){
- const labels:Record<TrackingState["status"],string>={"not-started":"출발 전",running:"달리는 중",stale:"계측 지연","finish-pending":"완주 계측 대기",finished:"완주 확인",dnf:"중도 포기",dns:"미출발"};
- return <section aria-label="등록 선수 현재 상태" className="rounded-2xl border border-zinc-200 p-4"><h2 className="text-lg font-bold">등록 선수 현재 상태 · {states.length}명</h2><ul className="mt-3 divide-y divide-zinc-200">{states.map(s=><li key={s.runner.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><strong>{s.runner.name}</strong><p className="text-sm text-zinc-500">#{s.runner.bib} · {s.runner.groupName??"그룹 미지정"}</p></div><div className="text-right text-sm"><strong>{labels[s.status]} · {(s.distanceMeters/1000).toFixed(1)}km</strong><p className="text-zinc-500">{s.lastCheckpoint?`최근 계측 ${s.lastCheckpoint.name} · ${new Date(s.lastCheckpoint.passedAt).toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul",hour12:false})}`:"첫 계측 대기 중"}</p></div></li>)}</ul>{!states.length&&<p className="mt-4 text-sm text-zinc-500">등록된 선수가 없습니다. 위에서 첫 선수를 등록해주세요.</p>}</section>;
+ return <section aria-label="등록 선수 현재 상태" className="rounded-2xl border border-zinc-200 p-4"><h2 className="text-lg font-bold">등록 선수 현재 상태 · {states.length}명</h2><ul className="mt-3 divide-y divide-zinc-200">{states.map(s=><li key={s.runner.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><strong>{s.runner.name}</strong><p className="text-sm text-zinc-500">#{s.runner.bib} · {s.runner.groupName??"그룹 미지정"}</p></div><div className="text-right text-sm"><strong>{trackingStatusLabel(s)} · {(s.distanceMeters/1000).toFixed(1)}km</strong><p className="text-zinc-500">{s.lastCheckpoint?`최근 계측 ${s.lastCheckpoint.name} · ${new Date(s.lastCheckpoint.passedAt).toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul",hour12:false})}`:"첫 계측 대기 중"}</p>{s.runner.timingStatus==="error"&&<p className="mt-1 max-w-md text-amber-900">{s.runner.timingMessage}</p>}</div></li>)}</ul>{!states.length&&<p className="mt-4 text-sm text-zinc-500">등록된 선수가 없습니다. 위에서 첫 선수를 등록해주세요.</p>}</section>;
 }
 
 function RaceForms({ data, write, mode }: { data: RaceSnapshot; write: (payload: RaceWrite) => Promise<void>; mode:"entries"|"admin" }) {

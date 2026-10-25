@@ -24,6 +24,11 @@ export type Runner = {
   groupName?: string;
   useGroupPrediction?: boolean;
   status: "running" | "dnf" | "dns";
+  timingStatus?: string | null;
+  timingMessage?: string | null;
+  timingErrorCode?: string | null;
+  timingCheckedAt?: string | null;
+  providerCourseCode?: string | null;
 };
 export type TrackingState = {
   runner: Runner;

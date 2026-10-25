@@ -85,15 +85,16 @@ check((await syncCall('{"manual":true}')).status,200);check(syncCalls.at(-1),[ra
 check((await syncCall('{"manual":"true"}')).status,400);check((await syncCall('null')).status,400);check((await syncCall('{')).status,400);
 
 const event=provider.parseTimingEvent({id:176,date:'2026-10-25',name:'대회',courses:[{course_cd:'10K',distance:'10',points:[{point_cd:'P0',lap:1,name:'출발',distance:'0'},{point_cd:'P1',lap:1,name:'5K',distance:'5'}]}]},'176');
-let key=false,requests=0,applies=[];
+let key=false,requests=0,applies=[],mismatched=false;const queueOrders=[];
+event.courses.push({code:"Full",name:"풀코스",distanceMeters:42195,points:event.courses[0].points});
 const require=Module.createRequire(import.meta.url);
 const publicProvider=compile('src/lib/race-tracking/myresult-public.ts',id=>id==='cheerio'?require('cheerio'):provider);
 const publicHTML=()=>'<div class="ant-card"><div class="ant-card-meta-title">대회</div><div class="ant-card-meta-description">2026-10-25</div></div><div class="card-player"><span class="ant-avatar-string">10K</span><div class="ant-card-meta-description">남자 | #123</div></div><div class="table-header"><div>구간명</div><div>통과시간</div><div>구간기록</div><div>누적기록</div></div><div class="table-row"><div>출발</div><div>'+(key?'09:00:00':'?')+'</div><div>-</div><div>-</div></div><div class="table-row"><div>5K</div><div>'+(key?'09:30:00':'?')+'</div><div>-</div><div>-</div></div>';
-const syncClient={rpc:async(fn,args)=>fn==='claim_tracking_sync'?{data:{url:'https://myresult.co.kr/176',code:'10K',token:'lease',version:'version',cursor:null},error:null}:(applies.push(args),{error:null}),from:table=>table==='tracking_races'?{select:()=>({eq:()=>({single:async()=>({data:{distance_meters:10000,start_at:'2026-10-25T09:00:00+09:00'},error:null})})})}:(()=>{const q={select:()=>q,eq:()=>q,is:()=>q,order:()=>q,limit:()=>q,gt:()=>q,then:resolve=>Promise.resolve({data:[{entry_id:user,bib:'00123'}],error:null}).then(resolve)};return q;})()};
+const syncClient={rpc:async(fn,args)=>fn==='claim_tracking_sync'?{data:{url:'https://myresult.co.kr/176',code:'10K',token:'lease',version:'version',cursor:'ffffffff-ffff-4fff-8fff-ffffffffffff'},error:null}:(applies.push(args),{error:null}),from:table=>table==='tracking_races'?{select:()=>({eq:()=>({single:async()=>({data:{distance_meters:10000,start_at:'2026-10-25T09:00:00+09:00'},error:null})})})}:(()=>{const q={select:()=>q,eq:()=>q,is:()=>q,order:(column,options)=>{queueOrders.push({column,options});return q;},limit:()=>q,gt:()=>{throw Error('legacy UUID cursor must not filter new runners');},then:resolve=>Promise.resolve({data:mismatched?[{entry_id:user,bib:'00123'},{entry_id:group,bib:'999'}]:[{entry_id:user,bib:'00123'}],error:null}).then(resolve)};return q;})()};
 const {synchronizeTracking}=compile('src/lib/race-tracking/sync-server.ts',id=>{
  if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>syncClient};
  if(id==='./myresult')return provider;
- if(id==='./myresult-public')return {fetchPublicTimingHTML:async()=>{requests++;return publicHTML();},parsePublicTimingPlayer:publicProvider.parsePublicTimingPlayer};
+ if(id==='./myresult-public')return {fetchPublicTimingHTML:async(url,bib)=>{requests++;let html=publicHTML().replace('#123','#'+bib);if(mismatched&&bib==='999')html=html.replace('>10K<','>Full<');return html;},parsePublicTimingPlayer:publicProvider.parsePublicTimingPlayer};
  if(id==='./myresult-server')return {timingCredentials:()=>key?{'X-Fixture':'fixture'}:null,inspectTimingSource:async()=>event,fetchTimingJSON:async()=>{requests++;return {event_id:176,course_cd:'10K',num:123,records:[]};}};
  throw Error(id);
 });
@@ -102,5 +103,11 @@ try{
 check((await synchronizeTracking(race)).status,'synced');check(requests,1);check(applies[0].records,[]);
 key=true;check((await synchronizeTracking(race)).status,'synced');check(requests,2);check(applies[1].token,'lease');check(applies[1].source_version,'version');
 check(applies[1].records.map(r=>r.distanceMeters),[0,5000]);
+check(queueOrders[0],{column:'timing_checked_at',options:{ascending:true,nullsFirst:true}});
+check(applies[1].entry_results[0].status,'synced');
+mismatched=true;check((await synchronizeTracking(race,true)).status,'partial');
+check(applies.at(-1).records.map(r=>r.distanceMeters),[0,5000]);
+check(applies.at(-1).entry_results.find(r=>r.entryId===group).code,'COURSE_MISMATCH');
+check(applies.at(-1).entry_results.find(r=>r.entryId===group).providerCourseCode,'Full');
 }finally{Date.now=realNow;}
 console.log(`Tracking staff API and sync orchestration: ${count} checks passed`);

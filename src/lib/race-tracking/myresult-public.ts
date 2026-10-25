@@ -15,7 +15,12 @@ export function parsePublicTimingPlayer(html:string,event:TimingEvent,code:strin
  const course=event.courses.find(c=>c.code===code);
  const rows=$('.table-row');
  const headers=$('.table-header').first().children().map((_,el)=>$(el).text().trim()).get();
- if(player.length!==1||!pageBib||canonical(pageBib)!==canonical(bib)||pageCode!==code||date!==event.date||title!==event.name||!course||rows.length===0||rows.length>100||headers[0]!=='구간명'||headers[1]!=='통과시간')throw new TimingError('INVALID_RESPONSE','공개 기록 화면의 대회·종목·배번호 또는 표 형식이 일치하지 않습니다.');
+ if(player.length!==1||!pageBib||canonical(pageBib)!==canonical(bib)||date!==event.date||title!==event.name||!course||rows.length===0||rows.length>100||headers[0]!=='구간명'||headers[1]!=='통과시간')throw new TimingError('INVALID_RESPONSE','공개 기록 화면의 대회·배번호 또는 표 형식이 일치하지 않습니다.');
+ if(pageCode!==code){
+  const actual=event.courses.find(c=>c.code===pageCode);
+  if(!actual)throw new TimingError('INVALID_RESPONSE','공개 기록의 종목을 확인할 수 없습니다.');
+  throw new TimingError('COURSE_MISMATCH',`배번호 ${bib}의 실제 종목은 ${actual.name} (${actual.code}, ${actual.distanceMeters/1000}km)입니다. 현재 연결은 ${code}입니다. 선수 코스를 변경하거나 해당 종목을 별도 연결해주세요.`,actual.code);
+ }
  const records:{point_cd:string;lap:number;time_point:string}[]=[];
  rows.each((_,el)=>{
   const cells=$(el).children().map((_,cell)=>$(cell).text().trim()).get();

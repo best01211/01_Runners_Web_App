@@ -46,6 +46,15 @@ import {fetchPublicTimingHTML,parsePublicTimingPlayer} from '../../src/lib/race-
 const publicPage=(rows:string[][],bib='123',code='Full',date=event.date,title=event.name)=>'<div class="ant-card"><div class="ant-card-meta-title">'+title+'</div><div class="ant-card-meta-description">'+date+' (일) | 공지천</div></div><div class="card-player ant-card"><div class="ant-card-meta-description">남자 | #'+bib+'</div><span class="ant-avatar-string">'+code+'</span></div><div class="table-header"><div>구간명</div><div>통과시간</div><div>구간기록</div><div>누적기록</div></div>'+rows.map(c=>'<div class="table-row">'+c.map(t=>'<div>'+t+'</div>').join('')+'</div>').join('');
 const observed=[['출발','09:02:00.000','-','-'],['5K','09:27:00.500','25:00','25:00'],['도착','12:32:00','-','-']];
 const parsePage=(html:string)=>parsePublicTimingPlayer(html,event,'Full','00123','entry',42195,start,now);
+test('course mismatches identify 10K and elite-full runners without importing foreign records',()=>{
+ const extended=parseTimingEvent({...raw,courses:[...raw.courses,{...raw.courses[0],course_cd:'EF',explain:'엘리트 풀코스'}]},'176');
+ for(const code of ['10K','EF']){
+  assert.throws(()=>parsePublicTimingPlayer(publicPage([['출발','09:02:00','-','-']],'123',code),extended,'Full','123','entry',42195,start,now),(error:unknown)=>{
+   const e=error as {code:string;courseCode:string;message:string};
+   assert.equal(e.code,'COURSE_MISMATCH');assert.equal(e.courseCode,code);assert.match(e.message,new RegExp(code));return true;
+  });
+ }
+});
 test('public SSR rows normalize into the same verified checkpoints without an API key',()=>{
  const records=parsePage(publicPage(observed));assert.equal(records.length,3);assert.equal(records[0].name,'START');assert.equal(records[1].passedAt,'2026-10-25T00:27:00.500Z');assert.equal(records[2].distanceMeters,42195);assert.equal(records[2].name,'FINISH');
  assert.deepEqual(records,parseTimingPlayer(player,event,'Full','00123','entry',42195,start,now));

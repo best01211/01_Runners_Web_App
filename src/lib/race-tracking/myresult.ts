@@ -1,6 +1,6 @@
 export type TimingCourse={code:string;name:string;distanceMeters:number;points:{code:string;lap:number;name:string;distanceMeters:number}[]};
 export type TimingEvent={id:string;name:string;date:string;courses:TimingCourse[]};
-export class TimingError extends Error {constructor(public code:string,message:string){super(message);}}
+export class TimingError extends Error {constructor(public code:string,message:string,public courseCode?:string){super(message);}}
 export function myResultSource(value:string){
  let url:URL;try{url=new URL(value.trim());}catch{throw new TimingError('INVALID_SOURCE','MyResult 대회 주소를 확인해주세요.');}
  const match=url.pathname.match(/^\/(?:api\/event\/)?([1-9]\d{0,8})\/?$/);
