@@ -107,3 +107,27 @@ body,.app-shell { background:var(--crew-paper); color:var(--crew-ink); }
   .dashboard-operation-links a { padding:14px 12px; font-size:13px; }
 }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; } }
+/* Home: one personal action, three shortcuts and two compact crew schedules. */
+.main-body>main.dashboard-page.home-simple{display:flex;flex-direction:column;align-items:stretch;max-width:880px;gap:24px;padding-top:28px}
+.home-greeting p{margin:0 0 8px;color:#68715c;font-size:13px}
+.home-greeting h1{margin:0;font-size:clamp(21px,3vw,28px);line-height:1.45;letter-spacing:-.8px;overflow-wrap:anywhere}
+.home-focus{padding:28px;border:1px solid #d9dfcf;border-radius:22px;background:#edf1e5;min-width:0}
+.home-focus-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.home-focus-heading h2{font-size:13px;font-weight:600;color:#536044}
+.home-focus-heading>span{font-size:12px;color:#3e542a;background:#fff;border-radius:99px;padding:5px 10px}
+.home-focus h3{font-size:clamp(21px,3vw,27px);line-height:1.4;letter-spacing:-.7px;margin:18px 0 12px;overflow-wrap:anywhere;font-weight:750}
+.home-focus-time{font-size:15px;font-weight:600}.home-focus-place{margin-top:6px;color:#626b59;font-size:14px;overflow-wrap:anywhere}
+.home-focus .button-primary,.home-focus .button-secondary{display:inline-flex;align-items:center;justify-content:center;gap:20px;min-height:46px;margin-top:22px;padding:12px 18px}
+.home-additional{display:block;width:fit-content;margin-top:14px;font-size:13px;text-decoration:underline;text-underline-offset:3px}
+.home-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.home-shortcuts a{display:flex;justify-content:center;align-items:center;gap:8px;min-height:62px;border:1px solid #dfe2d8;background:#fff;border-radius:14px;font-size:14px;font-weight:600}
+.home-shortcuts a:hover,.home-run-row:hover{background:#f0f2ea}
+.home-list-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.home-list-heading h2{font-size:17px;font-weight:700}.home-list-heading>a{font-size:13px;color:#58664a;min-height:44px;display:flex;align-items:center}
+.home-run-list{border:1px solid #dfe2d8;border-radius:18px;background:#fff;overflow:hidden}
+.home-run-row{display:flex;align-items:center;gap:18px;padding:20px;min-width:0}.home-run-row+.home-run-row{border-top:1px solid #e9ebe3}
+.home-run-date{display:flex;flex-direction:column;align-items:center;min-width:38px}.home-run-date strong{font-size:25px;line-height:1.15;font-weight:700}.home-run-date small{font-size:11px;color:#68715c;margin-top:4px}
+.home-run-info{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}.home-run-info small{color:#667159;font-size:11px}.home-run-info strong{font-size:16px;line-height:1.4;overflow-wrap:anywhere}.home-run-info>span{font-size:12px;color:#68715c}
+.home-list-empty{padding:22px;background:#fff;border:1px solid #dfe2d8;border-radius:16px;color:#68715c;font-size:14px}.home-list-empty a{text-decoration:underline}
+.home-operations{border-top:1px solid #dfe2d8;padding-top:14px;color:#68715c;font-size:13px}.home-operations summary{cursor:pointer;padding:10px 0;min-height:44px}.home-operations nav{display:flex;gap:12px}.home-operations a{padding:12px 0;text-decoration:underline;min-height:44px}
+@media(max-width:479px){.main-body>main.dashboard-page.home-simple{gap:20px;padding-top:22px}.home-focus{padding:22px}.home-shortcuts{gap:8px}.home-shortcuts a{flex-direction:column;gap:7px;font-size:12px;padding:12px 4px}.home-run-row{gap:12px;padding:17px}.home-focus .button-primary{width:100%}}

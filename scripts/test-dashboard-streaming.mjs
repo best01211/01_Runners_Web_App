@@ -1,5 +1,4 @@
-// Render the actual dashboard with a deliberately blocked ranking query.
-// This verifies that real schedule content, not just its fallback, streams first.
+// Render the real home and ensure schedules arrive without querying ranking.
 import assert from "node:assert/strict";
 import {readFileSync,existsSync} from "node:fs";
 import {createRequire} from "node:module";
@@ -45,10 +44,11 @@ try{
   new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Schedule content waited for the blocked ranking query")),5000);}),
  ]);
  clearTimeout(timer);
- assert.equal(scheduleReads,1);assert.equal(rankingReads,1);
+ assert.equal(scheduleReads,1);assert.equal(rankingReads,0);
  finishRanking({personalActivity:{rank:7,score:30,attended:3,late:0,absent:0,total:3,attendanceRate:100,seasonName:"STREAMED_ACTIVITY_DATA"}});
  for(;;){const chunk=await reader.read();if(chunk.done)break;html+=decoder.decode(chunk.value);}
- assert.ok(html.includes("STREAMED_ACTIVITY_DATA"));
- assert.ok(html.indexOf("STREAMED_SCHEDULE_DATA")<html.indexOf("STREAMED_ACTIVITY_DATA"));
- console.log("Dashboard streaming: schedule data arrives before ranking, with one shared schedule read");
+ assert.ok(!html.includes("STREAMED_ACTIVITY_DATA"));
+ assert.ok(html.includes("다음 러닝을 골라볼까요?"));
+ assert.ok(!html.includes("내 순위"));
+ console.log("Dashboard: schedules stream once and home performs no ranking query");
 }finally{clearTimeout(timer);finishRanking(null);reader.releaseLock();}
