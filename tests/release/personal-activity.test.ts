@@ -26,3 +26,12 @@ test('excluded users retain their own attendance but receive no ranking score or
  assert.equal(summary.rank,null);assert.equal(summary.score,null);assert.equal(summary.late,1);
  assert.deepEqual(buildPersonalActivity([],policy,new Set(),'me'),{rank:null,score:null,attended:0,late:0,absent:0,total:0,attendanceRate:null});
 });
+
+test('personal rank and earned score survive switching back to administrator mode',()=>{
+ const records=[row('me','attended','1'),row('me','late','2'),row('me','attended','3')];
+ for(const r of records)r.profiles!.role='staff';
+ const staff=buildPersonalActivity(records,DEFAULT_SCORE_POLICY,new Set(['1:me']),'me');
+ for(const r of records)r.profiles!.role='admin';
+ assert.deepEqual(buildPersonalActivity(records,DEFAULT_SCORE_POLICY,new Set(['1:me']),'me'),staff);
+ assert.equal(staff.rank,1);assert.equal(staff.score,30);
+});

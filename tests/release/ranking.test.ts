@@ -23,7 +23,7 @@ test("season boundaries use Korea time and include entire end date",()=>{
  assert.deepEqual(new Set(result.map(r=>r.userId)),new Set(["start","end"]));
 });
 test("hidden, inactive, excluded and test accounts cannot rank",()=>{
- for(const patch of [{role:"admin"},{account_status:"restricted"},{approval_status:"pending"},{ranking_excluded:true},{is_test_account:true},{role:"guest"}]) {
+ for(const patch of [{account_status:"restricted"},{approval_status:"pending"},{ranking_excluded:true},{is_test_account:true},{role:"guest"}]) {
  const x=row("a");Object.assign(x.profiles!,patch);assert.equal(buildRanking([x],policy,new Set()).length,0);
  }
  const guest=row("g");guest.profiles!.role="guest";assert.equal(buildRanking([guest],{...policy,includeGuests:true},new Set()).length,1);
@@ -50,4 +50,20 @@ test("ranking shows top ten and own row only when outside top ten",()=>{
  assert.equal(selectRankingDisplay(rows,"10").own,null);
  assert.equal(selectRankingDisplay(rows,"missing").own,null);
  assert.equal(selectRankingDisplay(rows.slice(0,2),"1").podium.length,2);
+});
+
+test('real attendance keeps identical scores and order when an administrator switches modes',()=>{
+ const real=[row('me','attended'),row('me','late'),row('other','attended')];
+ real[0].schedule_id='run1';real[1].schedule_id='run2';real[2].schedule_id='run1';
+ const pacers=new Set(['run1:me']);
+ for(const item of real.filter(r=>r.user_id==='me'))item.profiles!.role='staff';
+ const staff=buildRanking(real,{...policy,minimumAttendance:2},pacers);
+ for(const item of real.filter(r=>r.user_id==='me'))item.profiles!.role='admin';
+ assert.deepEqual(buildRanking(real,{...policy,minimumAttendance:2},pacers),staff);
+ assert.equal(staff[0].score,20);assert.equal(staff[0].attended,1);assert.equal(staff[0].late,1);
+ assert.equal(buildRanking(real,{...policy,minimumAttendance:3},pacers).length,0);
+ for(const flag of ['ranking_excluded','is_test_account'] as const){
+  const excluded=row('me');excluded.profiles!.role='admin';excluded.profiles![flag]=true;
+  assert.equal(buildRanking([excluded],policy,pacers).length,0);
+ }
 });

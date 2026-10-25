@@ -18,10 +18,12 @@ export function buildRanking(rows: RankingAttendance[], policy: ScorePolicy, pac
  const members = new Map<string, { userId: string; name: string; realName: string; nickname: string | null; attended: number; late: number; absent: number; total: number; score: number; attendanceRate: number }>();
  const start = season ? Date.parse(`${season.starts_on}T00:00:00+09:00`) : -Infinity;
  const end = season ? Date.parse(`${season.ends_on}T00:00:00+09:00`) + 86400000 : Infinity;
+ // Real attendance remains eligible across staff/admin mode changes.
+ // Administrator practice is stored separately in admin_schedule_tests, never in these rows.
  for (const row of rows) {
   const p = row.profiles, s = row.schedules;
-  if (!p || !s || p.role === "admin" || p.account_status !== "active" || p.approval_status !== "approved" || p.ranking_excluded || p.is_test_account || (!policy.includeGuests && p.role === "guest")) continue;
-  if (!["member", "staff", "guest"].includes(p.role) || s.status === "cancelled" || s.deleted_at || !["attended", "late", "absent"].includes(row.status)) continue;
+  if (!p || !s || p.account_status !== "active" || p.approval_status !== "approved" || p.ranking_excluded || p.is_test_account || (!policy.includeGuests && p.role === "guest")) continue;
+  if (!["member", "staff", "guest", "admin"].includes(p.role) || s.status === "cancelled" || s.deleted_at || !["attended", "late", "absent"].includes(row.status)) continue;
   const at = Date.parse(s.start_at);
   if (!Number.isFinite(at) || at < start || at >= end) continue;
   const v = members.get(row.user_id) ?? { userId: row.user_id, name: formatRankingName(p), realName: p.name?.trim() || "이름 없음", nickname: p.nickname?.trim() || null, attended: 0, late: 0, absent: 0, total: 0, score: 0, attendanceRate: 0 };
