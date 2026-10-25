@@ -1,3 +1,5 @@
+import {readJsonObject} from '@/lib/request-json';
+import {isUUID} from '@/lib/race-tracking/validation';
 import { fail, ok } from "@/lib/api-response";
 import { getCurrentProfile, isStaffOrAdmin } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -31,4 +33,15 @@ export async function POST(request: Request) {
   const client = await createSupabaseServerClient();
   const { data, error } = await client.rpc("create_season", { payload: body });
   return error ? fail("CREATE_FAILED", "시즌 생성에 실패했습니다. 기본 시즌은 공개 상태여야 합니다.", 409) : ok({ season: data }, 201);
+}
+
+export async function DELETE(request:Request){
+ if(request.headers.get('origin')!==new URL(request.url).origin)return fail('FORBIDDEN','허용되지 않은 요청입니다.',403);
+ const profile=await getCurrentProfile();if(!profile||!canAdminister(profile))return fail('FORBIDDEN','시즌 삭제 권한이 없습니다.',403);
+ const body=await readJsonObject(request);
+ if(!body||!isUUID(body.seasonId)||body.confirmation!=='시즌 삭제')return fail('INVALID_INPUT','삭제할 시즌을 확인해주세요.');
+ const {data,error}=await createSupabaseAdminClient().from('seasons').delete().eq('season_id',body.seasonId).select('season_id').maybeSingle();
+ if(error)return fail('DELETE_FAILED',error.code==='23503'?'이 시즌을 참조하는 기록이 있어 삭제할 수 없습니다.':'시즌을 삭제하지 못했습니다. 다시 시도해주세요.',409);
+ if(!data)return fail('NOT_FOUND','이미 삭제되었거나 존재하지 않는 시즌입니다.',404);
+ return ok({deleted:true,seasonId:data.season_id});
 }

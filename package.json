@@ -40,7 +40,8 @@
     "test:member-journey-browser": "node scripts/test-member-journey-browser.mjs",
     "test:home-browser": "node scripts/test-home-browser.mjs",
     "test:operations-menu-browser": "node scripts/test-operations-menu-browser.mjs",
-    "test:schedule-share-browser": "node scripts/test-schedule-share-browser.mjs"
+    "test:schedule-share-browser": "node scripts/test-schedule-share-browser.mjs",
+    "test:season-delete": "node scripts/test-season-delete-api.mjs && node scripts/test-season-delete-browser.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
