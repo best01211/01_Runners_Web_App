@@ -70,7 +70,14 @@ export async function DELETE(request: Request, { params }: Context) {if (request
     if(profile.role!=="admin")return fail("FORBIDDEN","관리자만 영구 삭제할 수 있습니다.",403);
     const client=await createSupabaseServerClient();
     const {error}=await client.rpc("delete_cancelled_schedule",{target_schedule:scheduleId,confirmation:String(body.confirmation??"")});
-    if(error)return fail("DELETE_FAILED",error.message.includes("CANCELLED_ONLY")?"취소된 일정만 영구 삭제할 수 있습니다.":"영구 삭제하지 못했습니다. 확인 문구와 연결 기록을 확인해주세요.",409);
+    if(error){
+      if(error.message.includes('CONFIRMATION_REQUIRED'))return fail('CONFIRMATION_REQUIRED','확인 문구에 영구 삭제를 정확히 입력해주세요.',400);
+      if(error.message.includes('CANCELLED_ONLY'))return fail('CANCELLED_ONLY','취소된 일정만 영구 삭제할 수 있습니다.',409);
+      if(error.message.includes('SCHEDULE_NOT_FOUND'))return fail('SCHEDULE_NOT_FOUND','이미 삭제되었거나 존재하지 않는 일정입니다.',404);
+      if(error.message.includes('FORBIDDEN'))return fail('FORBIDDEN','활성 관리자 계정으로 다시 로그인해주세요.',403);
+      if(error.message.includes('UNSUPPORTED_SCHEDULE_DEPENDENCY')||['PGRST202','42883'].includes(error.code??''))return fail('DELETE_SCHEMA_UPDATE_REQUIRED','일정 삭제 DB 업데이트가 필요합니다. 관리자에게 SQL 038 적용을 요청해주세요.',503);
+      return fail('DELETE_FAILED','연결 기록을 정리하지 못해 삭제를 취소했습니다. 잠시 후 다시 시도해주세요.',409);
+    }
     return ok({deleted:true});
   }
   let reason = "";

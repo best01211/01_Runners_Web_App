@@ -75,8 +75,15 @@ await deny(()=>db.query("select delete_cancelled_schedule($1,'영구 삭제')",[
 check((await db.query('select count(*)::int n from admin_schedule_tests')).rows[0].n,2);
 check((await db.query('select count(*)::int n from runner_checkpoints')).rows[0].n,1);
 await db.exec('drop table unknown_schedule_reference');
+// Reproduce the actual 037 notification FKs, including an empty table.
+await db.exec(`create table member_notifications(notification_id uuid primary key default gen_random_uuid(),schedule_id uuid references schedules on delete cascade,comment_id uuid references comments on delete cascade);`);
+await deny(()=>db.query("select delete_cancelled_schedule($1,'영구 삭제')",[run]),/UNSUPPORTED_SCHEDULE_DEPENDENCY/);
+const fix=read('../supabase/migrations/038_schedule_delete_notifications.sql');await db.exec(fix);await db.exec(fix);
+await db.query('insert into member_notifications(schedule_id,comment_id) select schedule_id,comment_id from comments');
 await db.query("select delete_cancelled_schedule($1,'영구 삭제')",[run]);
 check((await db.query('select count(*)::int n from schedules where schedule_id=$1',[run])).rows[0].n,0);
+check((await db.query('select count(*)::int n from member_notifications where schedule_id=$1',[run])).rows[0].n,0);
+check((await db.query('select count(*)::int n from member_notifications where schedule_id=$1',[neighbor])).rows[0].n,1);
 check((await db.query('select count(*)::int n from admin_schedule_tests')).rows[0].n,0);
 check((await db.query('select count(*)::int n from race_courses')).rows[0].n,0);
 check((await db.query('select count(*)::int n from race_entries')).rows[0].n,0);
