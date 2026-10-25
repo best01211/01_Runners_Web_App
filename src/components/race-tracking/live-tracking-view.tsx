@@ -14,8 +14,9 @@ const duration=(seconds:number)=>{const n=Math.max(0,Math.round(seconds));return
 const source=(s:TrackingState)=>s.paceSource==="timing" ? (s.startSource==="scheduled"?"실제 계측 · 예정 출발 기준":"실제 계측 기반") : s.paceSource==="pace-group"?"그룹 페이스 기준":"목표·기본 페이스 기준";
 const button="min-h-11 rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold";
 
-export function LiveTrackingView({data,course,states,selectedId,onSelect,onCourseSelect,now}:{data:RaceSnapshot;course:Course;states:TrackingState[];selectedId:string;onSelect:(id:string)=>void;onCourseSelect?:(id:string)=>void;now?:number}){
- const [pane,setPane]=useState<"overview"|"runner"|"cheer">("overview");
+export function LiveTrackingView({data,course,states,selectedId,onSelect,onCourseSelect,now,activePane,onPaneChange,showNavigation=true}:{data:RaceSnapshot;course:Course;states:TrackingState[];selectedId:string;onSelect:(id:string)=>void;onCourseSelect?:(id:string)=>void;now?:number;activePane?:"overview"|"runner"|"cheer";onPaneChange?:(pane:"overview"|"runner"|"cheer")=>void;showNavigation?:boolean}){
+ const [localPane,setLocalPane]=useState<"overview"|"runner"|"cheer">("overview");
+ const pane=activePane??localPane,setPane=onPaneChange??setLocalPane;
  const [query,setQuery]=useState("");
  const [allCourses,setAllCourses]=useState(false);
  const [expanded,setExpanded]=useState(false);
@@ -38,7 +39,7 @@ export function LiveTrackingView({data,course,states,selectedId,onSelect,onCours
  const map=<TrackingMap course={course} runners={states} selectedId={selected?.runner.id??""} onSelect={select} revision={0} compact expanded={expanded} onPickPoint={picking?pick:undefined} cheerDistance={distance}/>;
  const finishAt=(s:TrackingState)=>s.status==="finished"&&s.lastCheckpoint?clock(s.lastCheckpoint.passedAt):s.estimatedFinishSeconds===null?"—":clock((s.status==="not-started"?Date.parse(s.runner.startAt):serverNow-s.elapsedSeconds*1000)+s.estimatedFinishSeconds*1000);
  return <div className="space-y-5">
-  <nav aria-label="추적 화면" className="tracking-view-nav">{([["overview","대회 현황"],["runner","선수 기록"],["cheer","응원 지점"]] as const).map(([key,label])=><button key={key} type="button" onClick={()=>setPane(key)} aria-label={label} aria-pressed={pane===key} className="tracking-view-choice">{label}</button>)}</nav>
+  {showNavigation&&<nav aria-label="추적 화면" className="tracking-view-nav">{([["overview","대회 현황"],["runner","선수 기록"],["cheer","응원 지점"]] as const).map(([key,label])=><button key={key} type="button" onClick={()=>setPane(key)} aria-label={label} aria-pressed={pane===key} className="tracking-view-choice">{label}</button>)}</nav>}
    {!!data.courses?.length&&<nav aria-label="대회 종목" className="tracking-course-nav"><button aria-pressed={allCourses} onClick={()=>setAllCourses(!allCourses)} className="tracking-course-choice">전체 종목</button>{data.courses.map(c=><Link key={c.raceId} prefetch={false} href={onCourseSelect?"#":`/tracking/${c.raceId}`} onClick={e=>{setAllCourses(false);if(onCourseSelect){e.preventDefault();onCourseSelect(c.raceId);}}} aria-label={`${c.name} · ${c.distanceMeters/1000}km`} aria-current={c.raceId===data.raceId&&!allCourses?"page":undefined} className="tracking-course-choice">{c.name} · {c.distanceMeters/1000}km</Link>)}</nav>}
   {pane==="overview"&&<>
    {allCourses&&<section className="rounded-xl border border-zinc-200 p-4"><h2 className="font-bold">대회 전체 종목</h2><p className="mt-2 text-xs text-zinc-500">선수와 지도는 선택한 종목별로 확인합니다.</p><div className="divide-y divide-zinc-200">{data.courses?.map(c=><Link key={c.raceId} prefetch={false} href={onCourseSelect?"#":`/tracking/${c.raceId}`} onClick={e=>{setAllCourses(false);if(onCourseSelect){e.preventDefault();onCourseSelect(c.raceId);}}} className="flex justify-between gap-3 py-4 text-sm"><strong>{c.name} · {c.distanceMeters/1000}km</strong><span>{clock(c.startAt)} 출발 →</span></Link>)}</div></section>}

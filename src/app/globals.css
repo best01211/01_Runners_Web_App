@@ -693,9 +693,10 @@ input[type=checkbox] { width: 20px; height: 20px; }
 }
 
 /* Tracking states must override the shared shell button surface. */
-.tracking-view-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:6px;border:1px solid #c6cdd5;border-radius:16px;background:#e9edf1}
+.tracking-view-nav{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px solid #c6cdd5;border-radius:16px;background:#e9edf1}
+.tracking-view-nav>.tracking-view-choice{flex:1 1 100px;text-decoration:none}
 .app-shell main .tracking-view-choice,.tracking-view-choice{display:flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:10px 6px;border:2px solid transparent;border-radius:11px;background:transparent;color:#414b59;font-size:14px;font-weight:700;cursor:pointer}
-.app-shell main .tracking-view-choice[aria-pressed=true],.tracking-view-choice[aria-pressed=true]{border-color:#22261f;background:#22261f;color:#fff;box-shadow:0 2px 5px #17191c26}
+.app-shell main .tracking-view-choice[aria-pressed=true],.tracking-view-choice[aria-pressed=true],.app-shell main .tracking-view-choice[aria-current=page],.tracking-view-choice[aria-current=page]{border-color:#22261f;background:#22261f;color:#fff;box-shadow:0 2px 5px #17191c26}
 .tracking-view-choice[aria-pressed=true]::before{content:"\2713"}
 .tracking-course-nav{display:flex;flex-wrap:wrap;gap:8px;padding:14px;border:1px solid #b8c1cc;border-radius:14px;background:#fff}
 .app-shell main .tracking-course-choice,.tracking-course-choice{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:10px 14px;border:2px solid #aab2bc;border-radius:10px;background:#fff;color:#343d49;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer}

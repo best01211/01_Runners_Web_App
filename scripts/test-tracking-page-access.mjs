@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import Module from 'node:module';
+import ts from 'typescript';
+const require=Module.createRequire(import.meta.url);
+function compile(file,resolve){const m=new Module(file);m.require=resolve;m._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,file);return m.exports;}
+const access=compile('src/lib/auth/account-access.ts',require);
+let profile=null,reads=0;
+const raceId='11111111-1111-4111-8111-111111111111';
+const {TrackingRaceScreen}=compile('src/components/race-tracking/tracking-race-screen.tsx',id=>{
+ if(id==='react/jsx-runtime')return require(id);
+ if(id==='next/navigation')return {redirect:path=>{throw Error('REDIRECT:'+path);},notFound:()=>{throw Error('NOT_FOUND');}};
+ if(id==='@/lib/auth/account-access')return access;
+ if(id==='@/lib/auth/current-user')return {getCurrentPageProfile:async()=>profile};
+ if(id==='@/lib/race-tracking/validation')return {isUUID:()=>true};
+ if(id==='@/lib/tracking-snapshot-server')return {loadTrackingSnapshot:async()=>{reads++;return {title:'대회',course:null,eventId:raceId};}};
+ return new Proxy({},{get:()=>()=>null});
+});
+const render=view=>TrackingRaceScreen({params:Promise.resolve({raceId}),view});
+await assert.rejects(()=>render('entries'),/REDIRECT:\/login/);
+profile={role:'member',account_status:'active',approval_status:'approved'};
+await assert.rejects(()=>render('entries'),/REDIRECT:\/tracking\//);
+await assert.rejects(()=>render('admin'),/REDIRECT:\/tracking\//);
+assert.equal(reads,0,'unauthorized management pages must redirect before loading data');
+profile={...profile,role:'staff'};await render('entries');
+await assert.rejects(()=>render('admin'),/REDIRECT:\/tracking\//);
+assert.equal(reads,1);
+profile={...profile,role:'admin'};await render('entries');await render('admin');
+assert.equal(reads,3);
+profile={...profile,service_blocked:{liveTracking:true}};
+await assert.rejects(()=>render('admin'),/REDIRECT:\/maintenance/);
+assert.equal(reads,3);
+console.log('Tracking page access: login, staff registration, administrator-only settings and service restrictions passed');

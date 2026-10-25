@@ -17,6 +17,8 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const tileLayerRef = useRef<Leaflet.TileLayer | null>(null);
   const [showBackground, setShowBackground] = useState(true);
+  const background = useRef(showBackground);
+  useEffect(() => { background.current = showBackground; }, [showBackground]);
   const markers = useRef(new Map<string, Leaflet.CircleMarker>());
   const currentDistances = useRef(new Map<string, number>());
   const [readyCourse, setReadyCourse] = useState<Course|null>(null);
@@ -62,7 +64,10 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
         updateWhenIdle:false,updateWhenZooming:true,keepBuffer:3,updateInterval:100,
         referrerPolicy: "strict-origin-when-cross-origin",
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).on("tileerror", () => { if (!disposed) setTileError(true); });
+      }).on("tileerror", () => { if (!disposed) setTileError(true); })
+        .on("tileload", () => { if (!disposed) setTileError(false); });
+      // Attach to each new map immediately, including React's effect remounts.
+      if (background.current) tileLayerRef.current.addTo(map);
       L.polyline(course.points.map(p => [p.latitude, p.longitude] as [number, number]), { color: "#ffffff", weight: 10, opacity: 1,noClip:true,className:"tracking-course-outline" }).addTo(map);
       const line = L.polyline(course.points.map(p => [p.latitude, p.longitude] as [number, number]), {
         color: "#17465c", weight: 5, opacity: 1,noClip:true,className:"tracking-course-line",
@@ -74,7 +79,7 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
         const nextHeight=entries[0]?.contentRect.height??height;
         if (Math.abs(nextWidth - width) > 1||Math.abs(nextHeight-height)>1) {
           width = nextWidth;height=nextHeight;
-          map.invalidateSize({ pan: false });
+          map.invalidateSize({ pan: true, animate: false });
         }
       });
       resizeObserver.observe(container.current);
@@ -104,6 +109,22 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
     if (!ready || !map || !layer) return;
     if (showBackground) layer.addTo(map); else layer.remove();
   }, [ready, showBackground, course]);
+
+  useEffect(() => {
+    if (!ready) return;
+    // Wait until the expanded/collapsed container has its final layout, then
+    // refresh tile coverage as well as Leaflet's cached container dimensions.
+    const frame = requestAnimationFrame(() => {
+      const map = mapRef.current, layer = tileLayerRef.current;
+      if (!map || !layer) return;
+      map.invalidateSize({ pan: true, animate: false });
+      if (background.current) {
+        if (!map.hasLayer(layer)) layer.addTo(map);
+        layer.redraw();
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [expanded, ready, course]);
 
   useEffect(() => {
     const map = mapRef.current, L = leafletRef.current;
@@ -167,7 +188,10 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
   },[ready,course,cheerDistance]);
 
   return <div className="tracking-map relative overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
-    <div ref={container} style={{ backgroundColor: "#f4f4f5",touchAction:"pan-y" }} className={expanded?"h-[72svh] min-h-[380px] w-full":compact ? "h-[320px] w-full sm:h-[400px]" : "h-[62svh] min-h-[380px] w-full sm:h-[640px]"} aria-label="대회 코스와 선수 예상 위치 지도" />
+    <div className={expanded?"h-[72svh] min-h-[380px] w-full":compact ? "h-[320px] w-full sm:h-[400px]" : "h-[62svh] min-h-[380px] w-full sm:h-[640px]"}>
+      {/* Leaflet owns this element's classes. React only resizes its parent. */}
+      <div ref={container} style={{ height:"100%",width:"100%",backgroundColor:"#f4f4f5",touchAction:"pan-y" }} aria-label="대회 코스와 선수 예상 위치 지도" />
+    </div>
     <button type="button" onClick={() => mapRef.current?.fitBounds(course.points.map(p => [p.latitude, p.longitude] as [number, number]), { padding: [35, 35] })} className="absolute right-3 top-3 z-[1000] min-h-11 rounded-full border border-zinc-200 bg-white/95 px-4 py-2 text-sm font-bold text-slate-800 shadow-sm">코스 전체</button>
     <button type="button" aria-pressed={showBackground} onClick={() => setShowBackground(value => !value)} className="absolute right-3 top-16 z-[1000] min-h-11 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 shadow-sm">{showBackground ? "배경 지도 숨기기" : "배경 지도 표시"}</button>
     <p className="pointer-events-none absolute bottom-2 left-3 z-[1000] rounded-lg bg-white/90 px-2 py-1 text-xs text-zinc-600">한 손가락: 화면 스크롤 · 두 손가락: 지도 이동·확대</p>

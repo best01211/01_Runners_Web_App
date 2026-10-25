@@ -8,13 +8,13 @@ import {readFileSync,writeFileSync,mkdirSync,existsSync} from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 const dir=path.resolve('.test-output/tracking-ui');mkdirSync(dir,{recursive:true});
-writeFileSync(path.join(dir,'fixture.tsx'),`import React from 'react';import{createRoot}from'react-dom/client';import{TrackingDemo}from'../../src/components/race-tracking/tracking-demo';import{RaceRegistrationForm}from'../../src/components/race-tracking/race-registration-form';import{LiveTracking}from'../../src/components/race-tracking/live-tracking';import{DEMO_COURSE,DEMO_START,MockTimingProvider}from'../../src/lib/race-tracking/providers/mock';const now=DEMO_START+900000,p=new MockTimingProvider();const snapshot={serverNow:new Date(now).toISOString(),title:'서버 초기 데이터',canManage:true,courseLocked:true,currentUserId:'manager',course:{name:'하프',distanceMeters:DEMO_COURSE.distanceMeters,points:DEMO_COURSE.points,startAt:new Date(DEMO_START).toISOString()},runners:p.getRunners(now).map(r=>({...r,groupName:'B그룹',groupPaceSeconds:330,useGroupPrediction:true})),checkpoints:Object.fromEntries(p.getRunners(now).map(r=>[r.id,p.getCheckpoints(r.bib,now)])),entries:[],participants:[],groups:[{groupId:'g1',name:'B그룹',paceSeconds:330}]};if(location.search.includes('staff')){snapshot.canManage=false;snapshot.canRegisterEntries=true;snapshot.participants=[{userId:'33333333-3333-4333-8333-333333333333',name:'등록 대상'}];}window.__snapshot=snapshot;createRoot(document.getElementById('root')).render(<main className="mx-auto max-w-4xl px-4 py-6"><header className="border-b py-4 font-bold">2001 RUNNERS</header>{location.search.includes("register")?<RaceRegistrationForm/>:location.search?<LiveTracking scheduleId="fixture" apiPath="/api/tracking/fixture" title="서버 초기 데이터" initialData={snapshot}/>:<TrackingDemo/>}</main>);`);
+writeFileSync(path.join(dir,'fixture.tsx'),`import React from 'react';import{createRoot}from'react-dom/client';import{TrackingDemo}from'../../src/components/race-tracking/tracking-demo';import{RaceRegistrationForm}from'../../src/components/race-tracking/race-registration-form';import{LiveTracking}from'../../src/components/race-tracking/live-tracking';import{DEMO_COURSE,DEMO_START,MockTimingProvider}from'../../src/lib/race-tracking/providers/mock';const now=DEMO_START+900000,p=new MockTimingProvider();const snapshot={raceId:'fixture',eventId:'fixture',serverNow:new Date(now).toISOString(),title:'서버 초기 데이터',canManage:true,courseLocked:true,currentUserId:'manager',course:{name:'하프',distanceMeters:DEMO_COURSE.distanceMeters,points:DEMO_COURSE.points,startAt:new Date(DEMO_START).toISOString()},runners:p.getRunners(now).map(r=>({...r,groupName:'B그룹',groupPaceSeconds:330,useGroupPrediction:true})),checkpoints:Object.fromEntries(p.getRunners(now).map(r=>[r.id,p.getCheckpoints(r.bib,now)])),entries:[],participants:[],groups:[{groupId:'g1',name:'B그룹',paceSeconds:330}]};if(location.search.includes('staff'))sessionStorage.setItem('fixtureRole','staff');if(location.search.includes('staff')||(location.pathname.endsWith('/entries')&&sessionStorage.getItem('fixtureRole')==='staff')){snapshot.canManage=false;snapshot.canRegisterEntries=true;snapshot.participants=[{userId:'33333333-3333-4333-8333-333333333333',name:'등록 대상'}];}window.__snapshot=snapshot;createRoot(document.getElementById('root')).render(<main className="mx-auto max-w-4xl px-4 py-6"><header className="border-b py-4 font-bold">2001 RUNNERS</header>{location.search.includes("register")?<RaceRegistrationForm/>:(location.search||location.pathname.startsWith("/tracking/"))?<LiveTracking initialView={location.pathname.endsWith("/entries")?"entries":location.pathname.endsWith("/admin")?"admin":"overview"} scheduleId="fixture" apiPath="/api/tracking/fixture" title="서버 초기 데이터" initialData={snapshot}/>:<TrackingDemo/>}</main>);`);
 await build({entryPoints:[path.join(dir,'fixture.tsx')],outfile:path.join(dir,'bundle.js'),bundle:true,format:'esm',jsx:'automatic',loader:{'.png':'dataurl'},define:{'process.env.NODE_ENV':'"development"'},plugins:[{name:'next-fixture',setup(b){b.onResolve({filter:/^next\/(dynamic|link|navigation)$/},a=>({path:a.path,namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},a=>({loader:'jsx',resolveDir:process.cwd(),contents:a.path==='next/navigation'?`export function useRouter(){return {push(url){window.__push=url},refresh(){},replace(){}}}`:a.path==='next/link'?`import React from 'react';export default function Link({children,...props}){return <a {...props}>{children}</a>}`:`import React,{useEffect,useState}from'react';export default function dynamic(load,options){return function Dynamic(props){const[C,set]=useState(null);useEffect(()=>{let live=true;load().then(m=>{if(live)set(()=>m.default)});return()=>{live=false}},[]);return C?<C {...props}/>:<options.loading/>}}`}));}}]});
 const css=await postcss([tailwind()]).process(readFileSync('src/app/globals.css','utf8'),{from:path.resolve('src/app/globals.css')});
 writeFileSync(path.join(dir,'styles.css'),css.css);
 writeFileSync(path.join(dir,'index.html'),'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/bundle.css"><div class="app-shell"><div id="root"></div></div><script type="module" src="/bundle.js"></script>');
 const allowed=['index.html','bundle.js','bundle.css','styles.css'];
-const server=createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;const f=pathname==='/'?'index.html':pathname.slice(1);if(!allowed.includes(f)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(readFileSync(path.join(dir,f)));});
+const server=createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;const f=pathname==='/'||/^\/tracking\/fixture(?:\/(entries|admin))?$/.test(pathname)?'index.html':pathname.slice(1);if(!allowed.includes(f)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(readFileSync(path.join(dir,f)));});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
 try{
  const executablePath=process.env.CHROME_PATH??['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
@@ -25,6 +25,22 @@ try{
  await page.getByRole('heading',{name:'선수 현황 · 하프'}).waitFor();
  const activePane=page.getByRole('button',{name:'대회 현황',exact:true});assert.equal(await activePane.getAttribute('aria-pressed'),'true');assert.equal(await activePane.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(34, 38, 31)');assert.equal(await page.getByRole('link',{name:'하프 · 21.0975km',exact:true}).getAttribute('aria-current'),'page');
  await page.getByText('그룹 페이스 기준',{exact:false}).first().waitFor();
+ // Expansion and collapse must retain complete background tile coverage.
+ const assertTiles=async()=>{await page.waitForFunction(()=>{
+  const map=document.querySelector('.leaflet-container');if(!map)return false;
+  const rect=map.getBoundingClientRect(),tiles=[...map.querySelectorAll('img.leaflet-tile-loaded')].filter(img=>img.complete&&img.naturalWidth>0&&Number(getComputedStyle(img).opacity)>.9).map(img=>img.getBoundingClientRect());
+  return [[.05,.05],[.95,.05],[.05,.95],[.95,.95],[.5,.5]].every(([x,y])=>tiles.some(t=>rect.left+rect.width*x>=t.left&&rect.left+rect.width*x<=t.right&&rect.top+rect.height*y>=t.top&&rect.top+rect.height*y<=t.bottom));
+ },null,{timeout:10000}).catch(async error=>{console.log(await page.evaluate(()=>({container:document.querySelector('.leaflet-container')?.getBoundingClientRect().toJSON(),tiles:[...document.querySelectorAll('img.leaflet-tile')].map(e=>({rect:e.getBoundingClientRect().toJSON(),loaded:e.complete,opacity:getComputedStyle(e).opacity,cls:e.className})),panes:[...document.querySelectorAll('.leaflet-pane')].map(e=>({cls:e.className,style:e.getAttribute('style')}))})));await page.screenshot({path:path.join(dir,'map-resize-failure.png'),fullPage:true});throw error;});};
+ await assertTiles();
+ for(let i=0;i<3;i++){
+  await page.getByRole('button',{name:'지도 크게 보기',exact:true}).click();await assertTiles();
+  await page.getByRole('button',{name:'지도 줄이기',exact:true}).click();await assertTiles();
+ }
+ await page.getByRole('button',{name:'배경 지도 숨기기',exact:true}).click();
+ await page.getByRole('button',{name:'지도 크게 보기',exact:true}).click();
+ assert.equal(await page.locator('img.leaflet-tile').count(),0,'resize must respect an explicitly hidden background');
+ await page.getByRole('button',{name:'배경 지도 표시',exact:true}).click();await assertTiles();
+ await page.getByRole('button',{name:'지도 줄이기',exact:true}).click();await assertTiles();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.screenshot({path:path.join(dir,'01-overview-mobile.png'),fullPage:true});
  await page.getByRole('button',{name:'선수 기록',exact:true}).click();
@@ -42,6 +58,10 @@ try{
  await page.getByRole('link',{name:'10K · 10km',exact:true}).click();
  await page.getByRole('heading',{name:'선수 현황 · 10K'}).waitFor();
  await page.setViewportSize({width:1280,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ for(let i=0;i<2;i++){
+  await page.getByRole('button',{name:'지도 크게 보기',exact:true}).click();await assertTiles();
+  await page.getByRole('button',{name:'지도 줄이기',exact:true}).click();await assertTiles();
+ }
  await page.screenshot({path:path.join(dir,'04-overview-desktop.png'),fullPage:true});
  const requests=[];let seeded;
  await page.route('**/api/tracking/fixture',async route=>{requests.push(route.request().method());if(route.request().method()==='POST'){const body=route.request().postDataJSON();assert.equal(body.action,'group');assert.equal(body.paceSeconds,330);seeded.groups.push({groupId:'g2',name:body.name,paceSeconds:body.paceSeconds});return route.fulfill({json:{success:true,data:{saved:true}}});}return route.fulfill({json:{success:true,data:seeded}});});
@@ -49,9 +69,22 @@ try{
  seeded=await page.evaluate(()=>window.__snapshot);
  await page.getByRole('heading',{name:'서버 초기 데이터',exact:true}).waitFor();await page.waitForTimeout(250);
  assert.deepEqual(requests,[],'server seeded tracking must not fetch again on mount');
+ await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ assert.equal(await page.getByText('실제 추적 준비 상태',{exact:true}).count(),0);
+ assert.equal(await page.getByText('같은 대회에 종목 추가',{exact:true}).count(),0);
+ await page.screenshot({path:path.join(dir,'08-live-navigation-mobile.png'),fullPage:true});
  await page.getByRole('button',{name:'선수 기록',exact:true}).click();await page.getByRole('heading',{name:'계측 기록',exact:true}).waitFor();
  assert.deepEqual(requests,[],'local detail must reuse existing data');
- await page.getByText('관리자 · 코스와 계측 관리',{exact:true}).click();
+ assert.equal(await page.getByRole('heading',{name:'그룹 평균 페이스 등록',exact:true}).count(),0);
+ assert.equal(await page.getByLabel('선수 이름',{exact:true}).count(),0);
+ await page.getByRole('link',{name:'관리자',exact:true}).click();
+ await page.getByRole('heading',{name:'코스와 계측 관리',exact:true}).waitFor();
+ seeded=await page.evaluate(()=>window.__snapshot);
+ assert.equal(await page.locator('.leaflet-container').count(),0,'admin page must not mount a map');
+ await page.getByRole('heading',{name:'실제 추적 준비 상태',exact:true}).waitFor();
+ await page.getByText('같은 대회에 종목 추가',{exact:true}).waitFor();
+ assert.equal(await page.getByLabel('선수 이름',{exact:true}).count(),0,'entry fields belong to their own page');
+ assert.equal(await page.getByRole('link',{name:'관리자',exact:true}).getAttribute('aria-current'),'page');
  const groupForm=page.locator('form').filter({has:page.getByRole('heading',{name:'그룹 평균 페이스 등록',exact:true})});
  await groupForm.getByLabel('그룹 이름').fill('C그룹');await groupForm.getByLabel('분/km').fill('5');await groupForm.getByLabel('초',{exact:true}).fill('30');
  await groupForm.getByRole('button',{name:'그룹 등록',exact:true}).click();await page.getByText('저장했습니다.',{exact:true}).waitFor();
@@ -64,8 +97,8 @@ try{
  await page.unroute('**/api/tracking/fixture');const staffWrites=[];
  await page.route('**/api/tracking/fixture',async route=>{if(route.request().method()==='POST'){staffWrites.push(route.request().postDataJSON());return route.fulfill({json:{success:true,data:{saved:true}}});}return route.fulfill({json:{success:true,data:seeded}});});
  await page.goto(`http://127.0.0.1:${server.address().port}/?staff=1`);seeded=await page.evaluate(()=>window.__snapshot);
- await page.getByText('운영진 · 선수와 배번호 등록',{exact:true}).click();assert.equal(await page.getByRole('heading',{name:'그룹 평균 페이스 등록',exact:true}).count(),0);assert.equal(await page.getByText('대회 기록 자동 수집 설정',{exact:true}).count(),0);
- await page.getByLabel('배번호',{exact:true}).fill('00123');await page.getByLabel('소속 그룹').selectOption('g1');await page.getByRole('button',{name:'배번호 저장',exact:true}).click();await page.getByText('저장했습니다.',{exact:true}).waitFor();assert.equal(staffWrites.length,1);assert.equal(staffWrites[0].action,'entry');assert.equal(staffWrites[0].bib,'00123');await page.screenshot({path:path.join(dir,'07-staff-entry.png'),fullPage:true});
+ await page.getByRole('link',{name:'선수 등록',exact:true}).click();await page.getByRole('heading',{name:'선수 등록',exact:true}).waitFor();seeded=await page.evaluate(()=>window.__snapshot);assert.equal(await page.locator('.leaflet-container').count(),0,'entry page must not mount a map');assert.equal(await page.getByRole('link',{name:'관리자',exact:true}).count(),0,'staff must not see admin navigation');await page.getByRole('heading',{name:/등록 선수 현재 상태/}).waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await page.getByRole('heading',{name:'그룹 평균 페이스 등록',exact:true}).count(),0);assert.equal(await page.getByText('대회 기록 자동 수집 설정',{exact:true}).count(),0);
+ await page.getByLabel('선수 이름',{exact:true}).fill('직접 입력 선수');await page.getByLabel('배번호',{exact:true}).fill('00123');await page.getByLabel('소속 그룹').selectOption('g1');await page.getByRole('button',{name:'선수 등록',exact:true}).click();await page.getByText('저장했습니다.',{exact:true}).waitFor();assert.equal(staffWrites.length,1);assert.equal(staffWrites[0].action,'entry');assert.equal(staffWrites[0].bib,'00123');assert.equal(staffWrites[0].runnerName,'직접 입력 선수');assert.equal(staffWrites[0].userId,undefined);await page.screenshot({path:path.join(dir,'07-staff-entry.png'),fullPage:true});
  let registration;
  await page.route('**/api/tracking',async route=>{registration=route.request().postDataJSON();return route.fulfill({json:{success:true,data:{raceId:'registered-event'}}});});
  await page.goto(`http://127.0.0.1:${server.address().port}/?register=1`);await page.setViewportSize({width:390,height:844});
@@ -84,5 +117,5 @@ try{
  await page.screenshot({path:path.join(dir,'05-multi-course-registration.png'),fullPage:true});
  await page.getByRole('button',{name:'추적 대회 등록 · 2개 종목',exact:true}).click();await page.waitForFunction(()=>window.__push==='/tracking/registered-event');
  assert.equal(registration.action,'event');assert.equal(registration.courses.length,2);assert.equal(registration.courses[0].distanceMeters,42195);assert.equal(registration.courses[1].distanceMeters,10000);assert.notEqual(registration.courses[0].startAt,registration.courses[1].startAt);assert.notDeepEqual(registration.courses[0].points,registration.courses[1].points);assert.ok(JSON.stringify(registration).length<2000,'raw GPX metadata must not be uploaded');
- assert.deepEqual(errors,[]);console.log('Tracking UI browser: mobile/desktop layout, runner detail, cheering ETA, first 5km transition, course switching and multi-GPX registration (>2MB file), staff entry-only controls and keyless API setup passed');
+ assert.deepEqual(errors,[]);console.log('Tracking UI browser: mobile/desktop layout, runner detail, cheering ETA, first 5km transition, course switching and multi-GPX registration (>2MB file), repeated map expand/collapse tile coverage, separate registration/admin pages, named runner submission and keyless API setup passed');
 }finally{await browser?.close();await new Promise(r=>server.close(r));}
