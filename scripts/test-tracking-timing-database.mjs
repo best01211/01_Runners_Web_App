@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const db=new PGlite();let passed=0;
 await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
 create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-create table profiles(user_id uuid primary key,role text,account_status text,approval_status text);
+create table profiles(user_id uuid primary key,role text,account_status text,approval_status text,name text default '홍길동');
 create table withdrawal_requests(user_id uuid,status text);create table system_settings(setting_key text,setting_value jsonb);
 create function is_active_member() returns boolean language sql stable security definer set search_path=public as $$select exists(select 1 from profiles where user_id=auth.uid() and account_status='active' and approval_status='approved')$$;
 create function can_read_member() returns boolean language sql stable security definer set search_path=public as $$select is_active_member() and not exists(select 1 from withdrawal_requests where user_id=auth.uid() and status='pending')$$;
@@ -15,7 +15,7 @@ await db.exec(sql('007_standalone_tracking.sql'));await db.exec(sql('027_admin_m
 for(const fn of ['is_tracking_admin','can_read_tracking_race'])await db.exec(sql('025_schedule_admin_controls.sql').match(new RegExp(`create or replace function public\\.${fn}\\([\\s\\S]*?\\$\\$;`))[0]);
 for(const name of ['028_tracking_courses_groups.sql','029_tracking_multi_course_registration.sql','030_tracking_staff_and_timing.sql'])await db.exec(sql(name));
 const admin='11111111-1111-4111-8111-111111111111',staff='22222222-2222-4222-8222-222222222222',member='33333333-3333-4333-8333-333333333333';
-await db.query("insert into profiles values($1,'admin','active','approved'),($2,'staff','active','approved'),($3,'member','active','approved')",[admin,staff,member]);
+await db.query("insert into profiles(user_id,role,account_status,approval_status) values($1,'admin','active','approved'),($2,'staff','active','approved'),($3,'member','active','approved')",[admin,staff,member]);
 const actor=id=>db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);
 const no=async(fn,re)=>{await assert.rejects(fn,re);passed++;};
 const yes=(a,b)=>{assert.deepEqual(a,b);passed++;};
@@ -25,7 +25,13 @@ const {rows:[{id:race}]}=await db.query("select create_tracking_race($1::jsonb) 
 const write=p=>db.query('select write_tracking_race($1,$2::jsonb)',[race,JSON.stringify(p)]);
 await write({action:'group',name:'B',paceSeconds:300});const group=(await db.query('select group_id from tracking_pace_groups')).rows[0].group_id;
 const entry={action:'entry',userId:member,bib:'001',groupId:group};
+// Reproduce the deployed schema: registration previously omitted this required name.
+await db.exec('alter table tracking_race_entries add column runner_name text not null');
+await no(()=>write(entry),/null value in column "runner_name"/);
+await db.exec(sql('033_tracking_runner_names.sql'));
+await db.exec(sql('033_tracking_runner_names.sql'));
 await actor(staff);await db.exec('set role authenticated');await write(entry);passed++;
+yes((await db.query('select runner_name from tracking_race_entries')).rows[0].runner_name,'홍길동');
 await no(()=>write({action:'group',name:'NO',paceSeconds:300}),/RACE_FORBIDDEN/);
 await no(()=>write({...entry,userId:admin,bib:'002'}),/NOT_PARTICIPANT/);
 await no(()=>db.query('select write_tracking_race_manager($1,$2::jsonb)',[race,JSON.stringify(entry)]),/permission denied/);
@@ -59,4 +65,21 @@ await db.exec('set role service_role');lease=await claim();await db.exec('reset 
 await db.exec('reset role');await actor(admin);await configure();
 await db.exec('set role authenticated');await no(()=>db.query("insert into tracking_checkpoints(entry_id,name,distance_meters,passed_at,recorded_by) values($1,'x',1,now(),$2)",[entryId,staff]),/permission denied/);
 await no(()=>db.query("select apply_tracking_sync($1,$2,$3,'[]'::jsonb,null,'synced','')",[race,lease.token,version]),/permission denied/);
+await db.exec('reset role');await actor(admin);
+const {rows:[{id:futureRace}]}=await db.query('select create_tracking_race($1::jsonb) id',[JSON.stringify({name:'다음 대회',courseName:'10K',distanceMeters:10000,startAt:new Date(Date.now()+86400000).toISOString(),points:[{latitude:37,longitude:127},{latitude:37.1,longitude:127.1}]})]);
+await db.query('select write_tracking_race($1,$2::jsonb)',[futureRace,JSON.stringify({action:'group',name:'A',paceSeconds:300})]);
+const futureGroup=(await db.query('select group_id from tracking_pace_groups where race_id=$1',[futureRace])).rows[0].group_id;
+const register=p=>db.query('select write_tracking_race($1,$2::jsonb)',[futureRace,JSON.stringify({...entry,groupId:futureGroup,...p})]);
+await actor(staff);await register({runnerName:'가짜 이름'});
+yes((await db.query('select runner_name from tracking_race_entries where race_id=$1',[futureRace])).rows[0].runner_name,'홍길동');
+await db.query("update profiles set name='변경이름' where user_id=$1",[member]);
+await register({bib:'002',runnerName:'가짜 이름'});
+yes((await db.query('select runner_name,bib from tracking_race_entries where race_id=$1',[futureRace])).rows[0],{runner_name:'변경이름',bib:'002'});
+await db.query("update profiles set name=' ' where user_id=$1",[member]);
+await no(()=>register({}),/INVALID_RUNNER_NAME/);
+await db.query("update profiles set name='홍길동' where user_id=$1",[member]);
+// Fresh installations without the deployed extra column also retain old entries.
+await db.exec('alter table tracking_race_entries drop column runner_name');
+await db.exec(sql('033_tracking_runner_names.sql'));
+yes((await db.query('select runner_name from tracking_race_entries where race_id=$1',[race])).rows[0].runner_name,'홍길동');
 console.log(`Tracking staff/timing PostgreSQL: ${passed} checks passed`);await db.close();

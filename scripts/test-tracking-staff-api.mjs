@@ -8,13 +8,14 @@ const local=file=>compile(file,id=>local(path.resolve(path.dirname(file),id+'.ts
 const access=local('src/lib/auth/account-access.ts'),validation=local('src/lib/race-tracking/validation.ts'),provider=local('src/lib/race-tracking/myresult.ts');
 let profile=null,writes=[];const race='11111111-1111-4111-8111-111111111111',user='22222222-2222-4222-8222-222222222222',group='33333333-3333-4333-8333-333333333333';
 const response={fail:(code,message,status=400)=>Response.json({success:false,error:{code,message}},{status}),ok:data=>Response.json({success:true,data})};
+let memberName='홍길동',memberLookupError=null;
 const {POST}=compile('src/app/api/tracking/[raceId]/route.ts',id=>{
  if(id==='@/lib/tracking-snapshot-server')return {};
  if(id==='@/lib/auth/account-access')return access;
  if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>profile};
  if(id==='@/lib/api-response')return response;
  if(id==='@/lib/race-tracking/validation')return validation;
- if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{name:'대회',status:'active'},error:null})})})})})};
+ if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from:table=>{const q={select:()=>q,eq:()=>q,maybeSingle:async()=>table==='profiles'?{data:memberName===null?null:{name:memberName},error:memberLookupError}:{data:{name:'대회',status:'active'},error:null}};return q;}})};
  if(id==='@/lib/supabase/server')return {createSupabaseServerClient:async()=>({rpc:async(fn,args)=>{writes.push({fn,args});return {error:null};}})};
  throw Error(id);
 });
@@ -28,6 +29,32 @@ check(writes.length,1);
 profile={...profile,account_status:'restricted'};check((await call()).status,403);profile={...profile,account_status:'active',service_blocked:{liveTracking:true}};check((await call()).status,403);
 profile={...profile,service_blocked:{},withdrawal_pending:true};check((await call()).status,403);
 profile={role:'admin',account_status:'active',approval_status:'approved'};check((await call({action:'group',name:'B',paceSeconds:300})).status,200);
+check(writes[0].args.payload.runnerName,'홍길동');
+check((await call({...entry,runnerName:'가짜 이름'})).status,200);
+check(writes.at(-1).args.payload.runnerName,'홍길동');
+const validWrites=writes.length;
+memberName=' ';check((await call()).status,409);
+memberName=null;check((await call()).status,409);
+memberName='홍길동';memberLookupError={code:'08006'};check((await call()).status,503);
+check(writes.length,validWrites);memberLookupError=null;
+
+const snapshotClient={from:table=>{const results={
+ profiles:[{user_id:user,name:'홍길동',nickname:'andy01'}],
+ tracking_race_entries:[{entry_id:user,user_id:user,bib:'00123',group_id:group,target_pace_seconds:300,status:'running'}],
+ tracking_races:[{race_id:race,name:'대회',course_name:'10K',distance_meters:10000,start_at:'2026-10-25T09:00:00+09:00',status:'active',parent_race_id:null,points:[]}],
+ tracking_pace_groups:[{group_id:group,name:'B',pace_seconds:300}],
+ tracking_checkpoints:[],tracking_timing_sources:[],tracking_timing_sync:[],
+ };const result={data:results[table],error:null};const q={select:()=>q,eq:()=>q,neq:()=>q,in:()=>q,or:()=>q,order:()=>q,limit:()=>q,range:()=>q,maybeSingle:async()=>({...result,data:result.data[0]??null}),then:resolve=>Promise.resolve(result).then(resolve)};return q;}};
+const {loadTrackingSnapshot}=compile('src/lib/tracking-snapshot-server.ts',id=>{
+ if(id==='@/lib/auth/account-access')return access;
+ if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>snapshotClient};
+ if(id==='@/lib/race-tracking/myresult-server')return {timingCredentials:()=>null};
+ if(id==='@/lib/race-tracking/myresult')return provider;
+ throw Error(id);
+});
+const snapshot=await loadTrackingSnapshot(race,profile);
+check(snapshot.participants,[{userId:user,name:'홍길동'}]);
+check(snapshot.runners[0].name,'홍길동');
 
 const event=provider.parseTimingEvent({id:176,date:'2026-10-25',name:'대회',courses:[{course_cd:'10K',distance:'10',points:[{point_cd:'P0',lap:1,name:'출발',distance:'0'},{point_cd:'P1',lap:1,name:'5K',distance:'5'}]}]},'176');
 let key=false,requests=0,applies=[];
