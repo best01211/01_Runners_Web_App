@@ -678,8 +678,7 @@ input[type=checkbox] { width: 20px; height: 20px; }
    The outer map container still clips the map to its card. */
 .tracking-map .leaflet-overlay-pane > svg { overflow: visible; }
 
-/* The operation menu and account mode are independent controls. */
-.header-mode-control { flex-shrink: 0; }
+/* Operation menu trigger and dropdown. */
 .staff-menu nav { top: calc(100% + 12px); }
 .club-header-actions { flex-shrink: 0; }
 .staff-menu summary { white-space: nowrap; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; }
@@ -687,8 +686,6 @@ input[type=checkbox] { width: 20px; height: 20px; }
 .staff-menu summary:focus-visible { outline: 2px solid #52525b; outline-offset: 3px; }
 @media(max-width:639px) {
   .club-header-inner { flex-wrap: wrap; }
-  .header-mode-control { order: 3; display: flex; flex-basis: 100%; justify-content: flex-end; }
-  .club-header-inner:has(.header-mode-control) .staff-menu nav { top: calc(100% + 76px); }
   .club-header-actions { margin-left: auto; }
 }
 
@@ -703,3 +700,18 @@ input[type=checkbox] { width: 20px; height: 20px; }
 .app-shell main .tracking-course-choice[aria-pressed=true],.app-shell main .tracking-course-choice[aria-current=page],.tracking-course-choice[aria-pressed=true],.tracking-course-choice[aria-current=page]{border-color:#166534;background:#e8f5ec;color:#14532d;box-shadow:inset 0 -3px #166534}
 .tracking-course-choice[aria-pressed=true]::before,.tracking-course-choice[aria-current=page]::before{content:"\2713"}
 .tracking-view-choice:focus-visible,.tracking-course-choice:focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+
+/* Keep privileged mode controls inside the operation menu. */
+.staff-menu nav { width:280px; max-width:calc(100vw - 32px); }
+.staff-mode-section { padding:10px 12px 16px; margin-bottom:6px; border-bottom:1px solid var(--line); }
+.staff-mode-section>p { margin:0 0 10px; font-size:12px; color:#68715c; }
+@media(max-width:1023px) { .club-header-inner { position:relative; }.staff-menu { position:static; }.staff-menu nav { top:calc(100% + 4px); right:16px; } }
+/* Fit the single-row header on narrow phones without separating operations. */
+@media(max-width:479px){
+ .club-header-inner{flex-wrap:nowrap;gap:8px;padding-inline:12px}
+ .club-header-actions{gap:4px}
+ .club-header-actions>a[href="/notifications"]{padding-inline:8px;font-size:12px;gap:4px}
+ .staff-menu summary{padding-inline:8px}
+ .club-header-actions .logout-button{width:36px}
+}
+@media(max-width:359px){.club-brand .brand{width:64px}}
