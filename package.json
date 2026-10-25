@@ -39,7 +39,8 @@
     "test:member-journey": "node scripts/test-member-journey.mjs",
     "test:member-journey-browser": "node scripts/test-member-journey-browser.mjs",
     "test:home-browser": "node scripts/test-home-browser.mjs",
-    "test:operations-menu-browser": "node scripts/test-operations-menu-browser.mjs"
+    "test:operations-menu-browser": "node scripts/test-operations-menu-browser.mjs",
+    "test:schedule-share-browser": "node scripts/test-schedule-share-browser.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

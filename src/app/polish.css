@@ -175,3 +175,5 @@ body,.app-shell { background:var(--crew-paper); color:var(--crew-ink); }
  .home-no-runs{padding:20px 16px;gap:12px}.home-no-runs small{font-size:11px}.home-empty-icon{width:42px;height:42px}
 }
 @media(prefers-reduced-motion:reduce){.home-shortcuts a{transition:none}}
+
+.schedule-share{display:inline-flex;flex-wrap:wrap;gap:8px;align-items:center;max-width:100%}.schedule-share-button{display:inline-flex;align-items:center;gap:7px}.schedule-share-fallback{flex-basis:100%;max-width:440px;font-size:12px;color:#616d55}
