@@ -64,7 +64,9 @@ await deny(()=>db.query("select delete_cancelled_schedule($1,'영구 삭제')",[
 await db.query("update schedules set status='cancelled' where schedule_id=$1",[run]);
 await actor(staff);await deny(()=>db.query("select delete_cancelled_schedule($1,'영구 삭제')",[run]),/FORBIDDEN/);
 await actor(admin);await deny(()=>db.query("select delete_cancelled_schedule($1,'wrong')",[run]),/CONFIRMATION_REQUIRED/);
+await db.exec('alter table comments add column parent_comment_id uuid references comments(comment_id) on delete restrict');
 await db.query("insert into comments(schedule_id,content) values($1,'owned'),($2,'keep')",[run,neighbor]);
+await db.query("insert into comments(schedule_id,content,parent_comment_id) select schedule_id,'reply',comment_id from comments where schedule_id=$1",[run]);
 await db.query("insert into schedule_participations(schedule_id,user_id,status,pace_group_id) values($1,$2,'registered',$3)",[run,member,group]);
 await db.query("insert into attendances(schedule_id,user_id,status) values($1,$3,'attended'),($2,$3,'attended')",[run,neighbor,member]);
 await db.query('insert into race_courses values($1)',[run]);
@@ -80,8 +82,25 @@ await db.exec(`create table member_notifications(notification_id uuid primary ke
 await deny(()=>db.query("select delete_cancelled_schedule($1,'영구 삭제')",[run]),/UNSUPPORTED_SCHEDULE_DEPENDENCY/);
 const fix=read('../supabase/migrations/038_schedule_delete_notifications.sql');await db.exec(fix);await db.exec(fix);
 await db.query('insert into member_notifications(schedule_id,comment_id) select schedule_id,comment_id from comments');
+// Match the legacy FK graph supplied by the production diagnosis CSV.
+await db.exec(`create table attendance_sessions(attendance_session_id uuid primary key default gen_random_uuid(),schedule_id uuid not null references schedules on delete restrict);
+create table attendance_records(record_id uuid primary key default gen_random_uuid(),schedule_id uuid references schedules on delete restrict,participation_id uuid references schedule_participations on delete restrict,attendance_session_id uuid references attendance_sessions on delete restrict);`);
+// 038 still rejects even an EMPTY legacy session table.
+await deny(()=>db.query("select delete_cancelled_schedule($1,'영구 삭제')",[run]),/UNSUPPORTED_SCHEDULE_DEPENDENCY/);
+check((await db.query('select count(*)::int n from schedules where schedule_id=$1',[run])).rows[0].n,1);
+await db.query('insert into attendance_sessions(schedule_id) values($1),($2)',[run,neighbor]);
+await db.query('insert into attendance_records(schedule_id,attendance_session_id,participation_id) select a.schedule_id,a.attendance_session_id,p.participation_id from attendance_sessions a left join schedule_participations p on p.schedule_id=a.schedule_id');
+const legacyFix=read('../supabase/migrations/039_schedule_delete_attendance_sessions.sql');await db.exec(legacyFix);await db.exec(legacyFix);
+// The fix must preserve unknown-dependency protection and atomic rollback.
+await db.exec('create table unknown_schedule_reference(id uuid references schedules)');await db.query('insert into unknown_schedule_reference values($1)',[run]);
+await deny(()=>db.query("select delete_cancelled_schedule($1,'영구 삭제')",[run]),/UNSUPPORTED_SCHEDULE_DEPENDENCY/);
+check((await db.query('select count(*)::int n from attendance_sessions')).rows[0].n,2);
+check((await db.query('select count(*)::int n from attendance_records')).rows[0].n,2);
+await db.exec('drop table unknown_schedule_reference');
+
 await db.query("select delete_cancelled_schedule($1,'영구 삭제')",[run]);
 check((await db.query('select count(*)::int n from schedules where schedule_id=$1',[run])).rows[0].n,0);
+for(const table of ['attendance_sessions','attendance_records']){check((await db.query('select count(*)::int n from '+table+' where schedule_id=$1',[run])).rows[0].n,0);check((await db.query('select count(*)::int n from '+table+' where schedule_id=$1',[neighbor])).rows[0].n,1);}
 check((await db.query('select count(*)::int n from member_notifications where schedule_id=$1',[run])).rows[0].n,0);
 check((await db.query('select count(*)::int n from member_notifications where schedule_id=$1',[neighbor])).rows[0].n,1);
 check((await db.query('select count(*)::int n from admin_schedule_tests')).rows[0].n,0);
