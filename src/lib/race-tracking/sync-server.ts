@@ -2,9 +2,9 @@ import {fetchPublicTimingHTML,parsePublicTimingPlayer} from './myresult-public';
 import {createSupabaseAdminClient} from '@/lib/supabase/admin';
 import {inspectTimingSource} from './myresult-server';
 import {myResultSource,parseTimingPlayer,TimingError} from './myresult';
-export async function synchronizeTracking(raceId:string){
+export async function synchronizeTracking(raceId:string,manualRefresh=false){
  const admin=createSupabaseAdminClient();
- const {data:lease,error}=await admin.rpc('claim_tracking_sync',{target_race:raceId});
+ const {data:lease,error}=await admin.rpc('claim_tracking_sync',{target_race:raceId,manual_refresh:manualRefresh});
  if(error)throw new Error('SYNC_DATABASE_ERROR');
  if(!lease)return {status:'waiting'};
  let status='synced',message='기록 제공처의 최신 응답을 확인했습니다.',cursor:string|null=null;
@@ -17,7 +17,7 @@ export async function synchronizeTracking(raceId:string){
   const providerCourse=event.courses.find(c=>c.code===lease.code);
   const localDate=new Date(Date.parse(course.start_at)+9*3600000).toISOString().slice(0,10);
   if(!providerCourse||Math.abs(providerCourse.distanceMeters-course.distance_meters)>50||localDate!==event.date)throw new TimingError('COURSE_MISMATCH','연결된 대회 날짜·종목·공식 거리를 확인해주세요.');
-  let query=admin.from('tracking_race_entries').select('entry_id,bib').eq('race_id',raceId).eq('status','running').order('entry_id').limit(40);
+  let query=admin.from('tracking_race_entries').select('entry_id,bib').eq('race_id',raceId).eq('status','running').is('deleted_at',null).order('entry_id').limit(40);
   if(lease.cursor)query=query.gt('entry_id',lease.cursor);
   const {data:entries,error:entryError}=await query;if(entryError)throw new Error('DATABASE_ERROR');
   // At most 40 individual requests, four at once, with a 4.5s per-request deadline.

@@ -9,6 +9,9 @@ export async function POST(request:Request,{params}:{params:Promise<{raceId:stri
  const p=await getCurrentProfile();if(!p)return fail('UNAUTHORIZED','로그인이 필요합니다.',401);
  if(!canUseService(p)||p.service_blocked?.liveTracking)return fail('FORBIDDEN','현재 추적 기능을 이용할 수 없습니다.',403);
  const {raceId}=await params;if(!isUUID(raceId))return fail('NOT_FOUND','대회를 찾을 수 없습니다.',404);
- try{const response=ok(await synchronizeTracking(raceId));response.headers.set('Cache-Control','private, no-store');return response;}
+ let body: {manual?:boolean};
+ try{const raw=await request.text();if(raw.length>1000)return fail('INVALID_INPUT','요청 형식을 확인해주세요.');body=raw?JSON.parse(raw):{};if(!body||typeof body!=='object'||Array.isArray(body)||(body.manual!==undefined&&typeof body.manual!=='boolean'))return fail('INVALID_INPUT','요청 형식을 확인해주세요.');}
+ catch{return fail('INVALID_INPUT','요청 형식을 확인해주세요.');}
+ try{const response=ok(await synchronizeTracking(raceId,body.manual===true));response.headers.set('Cache-Control','private, no-store');return response;}
  catch{return fail('SYNC_FAILED','기록을 갱신하지 못했습니다. DB 설정과 연결 상태를 확인해주세요.',503);}
 }

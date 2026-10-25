@@ -3,8 +3,10 @@ import type { Coordinate } from "./types";
 
 export type RaceWrite =
  | { action: "course"; name: string; distanceMeters: number; points: Coordinate[]; startAt: string; courseName?: string; parentRaceId?: string }
- | { action: "group"; name: string; paceSeconds: number }
- | { action: "entry"; userId?: string; runnerName?: string; entryId?: string; bib: string; targetPaceSeconds: number | null; groupId?: string }
+ | { action: "group"; name: string; paceSeconds: number; courseId?: string }
+ | { action: "entry"; userId?: string; runnerName?: string; entryId?: string; bib: string; targetPaceSeconds: number | null; groupId?: string | null }
+ | { action: "entry-delete"; entryId: string }
+ | { action: "entry-move"; entryId: string; courseId: string; groupId: string | null }
  | { action: "checkpoint"; entryId: string; name: string; distanceMeters: number; passedAt: string }
  | { action: "status"; entryId: string; status: "running" | "dnf" | "dns" };
 export const isUUID = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -34,7 +36,7 @@ export function validateRaceWrite(value: unknown): RaceWrite {
   if(b.parentRaceId!==undefined&&!isUUID(b.parentRaceId))throw new Error("대회를 선택해주세요.");
   return { action: "course", name: text(b.name, 100), points, distanceMeters, startAt: time(b.startAt), ...(b.courseName!==undefined?{courseName:text(b.courseName,60)}:{}), ...(b.parentRaceId?{parentRaceId:b.parentRaceId as string}:{}) };
  }
- if(b.action==="group") { const paceSeconds=number(b.paceSeconds,120,1200);if(!Number.isInteger(paceSeconds))throw new Error("페이스는 정수 초로 입력해주세요.");return {action:"group",name:text(b.name,40),paceSeconds}; }
+ if(b.action==="group") { const paceSeconds=number(b.paceSeconds,120,1200);if(!Number.isInteger(paceSeconds))throw new Error("페이스는 정수 초로 입력해주세요.");if(b.courseId!==undefined&&!isUUID(b.courseId))throw new Error("코스를 선택해주세요.");return {action:"group",name:text(b.name,40),paceSeconds,...(b.courseId?{courseId:b.courseId as string}:{})}; }
  if (b.action === "entry") {
   if (b.runnerName === undefined && !isUUID(b.userId)) throw new Error("선수 이름을 입력해주세요.");
   const runnerName = b.runnerName === undefined ? undefined : text(b.runnerName, 50);
@@ -44,10 +46,16 @@ export function validateRaceWrite(value: unknown): RaceWrite {
   if (!/^[A-Za-z0-9-]+$/.test(bib)) throw new Error("배번호는 영문·숫자·하이픈만 사용할 수 있습니다.");
   const pace = b.targetPaceSeconds === null ? null : number(b.targetPaceSeconds, 120, 1200);
   if (pace !== null && !Number.isInteger(pace)) throw new Error("페이스는 정수 초로 입력해주세요.");
-  if(b.groupId!==undefined&&!isUUID(b.groupId))throw new Error("그룹을 선택해주세요.");
-  return { action: "entry", ...(runnerName ? { runnerName } : { userId: b.userId as string }), ...(b.entryId ? { entryId: b.entryId as string } : {}), bib, targetPaceSeconds: pace, ...(b.groupId?{groupId:b.groupId as string}:{}) };
+  if(b.groupId!==undefined&&b.groupId!==null&&!isUUID(b.groupId))throw new Error("그룹을 선택해주세요.");
+  return { action: "entry", ...(runnerName ? { runnerName } : { userId: b.userId as string }), ...(b.entryId ? { entryId: b.entryId as string } : {}), bib, targetPaceSeconds: pace, ...(b.groupId?{groupId:b.groupId as string}:b.groupId===null?{groupId:null}:{}) };
  }
  if (!isUUID(b.entryId)) throw new Error("출전 선수를 선택해주세요.");
+ if (b.action === "entry-delete") return {action:"entry-delete",entryId:b.entryId};
+ if (b.action === "entry-move") {
+  if(!isUUID(b.courseId))throw new Error("이동할 코스를 선택해주세요.");
+  if(b.groupId!==undefined&&b.groupId!==null&&!isUUID(b.groupId))throw new Error("그룹을 선택해주세요.");
+  return {action:"entry-move",entryId:b.entryId,courseId:b.courseId,groupId:b.groupId as string??null};
+ }
  if (b.action === "status" && ["running","dnf","dns"].includes(String(b.status))) return { action: "status", entryId: b.entryId, status: b.status as "running" | "dnf" | "dns" };
  if (b.action === "checkpoint") return { action: "checkpoint", entryId: b.entryId, name: text(b.name, 40), distanceMeters: number(b.distanceMeters, 0, 100000), passedAt: time(b.passedAt) };
  throw new Error("올바르지 않은 요청입니다.");

@@ -49,10 +49,10 @@ export async function GET(_:Request,{params}:Context){
 
 const errors: Record<string, string> = {
  DUPLICATE_COURSE:"이미 등록된 종목 이름입니다.", INVALID_COURSE:"종목 이름과 코스 정보를 확인해주세요.",
- GROUP_REQUIRED:"먼저 해당 종목의 그룹을 선택해주세요.", EVENT_ENTRY_EXISTS:"이미 이 대회의 다른 종목에 등록된 회원입니다.", GROUP_LIMIT:"종목별 그룹은 50개까지 등록할 수 있습니다.",
+ GROUP_REQUIRED:"선택한 그룹이 해당 코스의 그룹인지 확인해주세요. 그룹 미지정으로도 등록할 수 있습니다.", EVENT_ENTRY_EXISTS:"이미 이 대회의 다른 종목에 등록된 회원입니다.", GROUP_LIMIT:"종목별 그룹은 50개까지 등록할 수 있습니다.",
  RACE_FORBIDDEN: "변경 권한이 없습니다.", RACE_NOT_FOUND: "진행 가능한 이벤트가 아닙니다.",
  COURSE_LOCKED: "선수가 등록된 코스는 변경할 수 없습니다.", COURSE_REQUIRED: "먼저 코스를 등록해주세요.",
- NOT_PARTICIPANT: "승인된 활성 회원만 출전 등록할 수 있습니다.", ENTRY_LOCKED: "출발 이후 또는 계측 기록이 있는 선수 정보는 수정할 수 없습니다.",
+ NOT_PARTICIPANT: "승인된 활성 회원만 출전 등록할 수 있습니다.", ENTRY_LOCKED: "계측 기록이 있는 선수 정보는 수정할 수 없습니다. 잘못 등록한 선수는 삭제하거나 코스를 변경해주세요.",
  INVALID_RUNNER_NAME: "선수 이름을 1~50자로 입력해주세요.",
  ENTRY_NOT_FOUND: "선수를 찾을 수 없습니다.", STATUS_LOCKED: "완주·미출발·중도 포기 상태와 계측 기록을 확인해주세요.",
  INVALID_CHECKPOINT: "코스 거리·대회 출발 시각을 확인해주세요. 미래 통과 시각은 입력할 수 없습니다.",
@@ -68,7 +68,7 @@ export async function POST(request: Request, { params }: Context) {
  let write;
  try { const raw = await request.text(); if (raw.length > 2000000) return fail("TOO_LARGE", "요청 크기가 너무 큽니다.", 413); write = validateRaceWrite(JSON.parse(raw)); }
  catch (e) { return fail("INVALID_INPUT", e instanceof Error ? e.message : "입력값을 확인해주세요."); }
- if (write.action==="entry"?!canRegisterTrackingEntries(c.profile):!c.canManage) return fail("FORBIDDEN", "해당 추적 정보를 변경할 권한이 없습니다.", 403);
+ if (["entry","entry-delete","entry-move"].includes(write.action)?!canRegisterTrackingEntries(c.profile):!c.canManage) return fail("FORBIDDEN", "해당 추적 정보를 변경할 권한이 없습니다.", 403);
  // Use the selected member's real name, never a client-supplied name or login ID.
  let payload: typeof write & { runnerName?: string } = write;
  if (write.action === "entry" && !write.runnerName) {

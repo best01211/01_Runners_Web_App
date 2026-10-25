@@ -6,6 +6,7 @@ import { LiveTrackingView } from "./live-tracking-view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { buildCourse, courseFromGeoJSON, courseFromGPX } from "@/lib/race-tracking/course";
+import {nextTrackingRefresh,canRefreshTracking} from "@/lib/race-tracking/refresh-policy";
 import { trackRunner } from "@/lib/race-tracking/engine";
 import type { RaceSnapshot } from "@/lib/race-tracking/live-types";
 import type { RaceWrite } from "@/lib/race-tracking/validation";
@@ -28,6 +29,8 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  const anchor = useRef<{ now: number; at: number; healthy: boolean } | null>(null);
  const activeRequest = useRef<AbortController | null>(null);
  const mounted = useRef(false);
+ const lastRefresh=useRef(-Infinity),refreshActive=useRef(false);
+ const [coolingDown,setCoolingDown]=useState(false);
  const load = useCallback(async () => {
   if (activeRequest.current) return;
   const controller = new AbortController(); activeRequest.current = controller;
@@ -55,22 +58,35 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  useEffect(() => {
   mounted.current = true;
   if(initialData)anchor.current={now:Date.parse(initialData.serverNow),at:performance.now(),healthy:true};else void load();
-  const poll = setInterval(() => { if (document.visibilityState === "visible") void load(); }, 15000);
-  const tick = setInterval(() => { const a = anchor.current; if (a?.healthy) setNow(a.now + Math.min(30000, performance.now() - a.at)); }, 1000);
-  const visible = () => { if (document.visibilityState === "visible") void load(); };
-  document.addEventListener("visibilitychange", visible);
-  return () => { mounted.current = false; activeRequest.current?.abort(); activeRequest.current = null; clearInterval(poll); clearInterval(tick); document.removeEventListener("visibilitychange", visible); };
+  const tick = setInterval(() => { const a = anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();if(a?.healthy)setNow(clock);setCoolingDown(!canRefreshTracking(clock,lastRefresh.current)); }, 1000);
+  return () => { mounted.current = false; activeRequest.current?.abort(); activeRequest.current = null; clearInterval(tick); };
  }, [load,initialData]);
  const automatic=!!(data?.timing?.enabled&&(data.timing.collectionMode==="public-page"||data.timing.credentialsReady)&&data.timing.courseCode);
+ const startAt=data?.course?.startAt;
+ const refresh=useCallback(async(manual:boolean)=>{
+  const a=anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();
+  if(refreshActive.current||!canRefreshTracking(clock,lastRefresh.current))return;
+  lastRefresh.current=clock;refreshActive.current=true;setCoolingDown(true);setRefreshing(true);
+  try{
+   if(automatic&&startAt&&clock>=Date.parse(startAt)){
+    const r=await fetch(endpoint+"/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({manual}),cache:"no-store",signal:AbortSignal.timeout(55000)});
+    const result=await r.json();if(!r.ok||!result.success)throw new Error("자동 계측 갱신이 지연됩니다.");
+   }
+   await load();
+  }catch(e){if(mounted.current)setError(e instanceof Error?e.message:"계측 갱신이 지연됩니다.");}
+  finally{refreshActive.current=false;if(mounted.current)setRefreshing(false);}
+ },[automatic,startAt,endpoint,load]);
  useEffect(()=>{
-  if(!automatic)return;let disposed=false,active:AbortController|null=null;
-  const sync=async()=>{if(document.visibilityState!=="visible"||active)return;const controller=new AbortController();active=controller;const timeout=setTimeout(()=>controller.abort(),55000);
-   try{const r=await fetch(`${endpoint}/sync`,{method:"POST",signal:controller.signal,cache:"no-store"});const result=await r.json();if(!r.ok||!result.success)throw new Error("자동 계측 갱신이 지연됩니다.");if(!disposed&&result.data.status!=="waiting")await load();}
-   catch{if(!disposed)setError("자동 계측 갱신이 지연됩니다. 마지막 수신 기록을 유지합니다.");}
-   finally{clearTimeout(timeout);active=null;}
-  };
-  void sync();const timer=setInterval(()=>void sync(),30000);return()=>{disposed=true;active?.abort();clearInterval(timer);};
- },[automatic,endpoint,load]);
+  if(!startAt)return;
+  const a=anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();
+  let next=nextTrackingRefresh(startAt,clock);
+  const timer=setInterval(()=>{
+   const anchorValue=anchor.current,current=anchorValue?anchorValue.now+performance.now()-anchorValue.at:Date.now();
+   if(document.visibilityState!=="visible"||current<next)return;
+   next=nextTrackingRefresh(startAt,current);void refresh(false);
+  },1000);
+  return()=>clearInterval(timer);
+ },[startAt,refresh]);
  const courseData = data?.course;
  const course = useMemo(() => courseData ? buildCourse(courseData.points, courseData.distanceMeters) : null, [courseData]);
  const states = useMemo(() => course && data ? data.runners.map(runner => trackRunner(runner, data.checkpoints[runner.id] ?? [], course, now)) : [], [course, data, now]);
@@ -83,7 +99,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  }
  return <div className="mt-4 space-y-4 text-zinc-900">
   <header className="border-b border-zinc-200 p-4"><p className="text-sm font-bold text-zinc-600">대회 선수 추적 · 계측 기반 예측</p><h1 className="mt-2 break-words text-2xl font-black sm:text-3xl">{title}</h1>{data?.course&&<p className="mt-2 text-sm text-zinc-500">{data.course.name} · {new Date(data.course.startAt).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})} 출발</p>}{!data?.course && <p className="mt-3 text-sm leading-6">계측 기록으로 계산한 예상 위치입니다. GPS 실측 위치가 아닙니다.</p>}</header>
-  <div className="flex items-center justify-between gap-3 px-1"><p className="min-w-0 text-xs leading-5 text-zinc-500">{data ? `마지막 수신: ${new Date(data.serverNow).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })} · 15초마다 갱신` : "추적 정보를 불러오는 중입니다."}</p><button className="min-h-11 shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-40" disabled={refreshing} onClick={() => void load()}>{refreshing ? "갱신 중…" : "새로고침"}</button></div>
+  <div className="flex items-center justify-between gap-3 px-1"><p className="min-w-0 text-xs leading-5 text-zinc-500">{data ? `마지막 수신: ${new Date(data.serverNow).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })} · 출발 후 3분마다 갱신` : "추적 정보를 불러오는 중입니다."}</p><button className="min-h-11 shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-40" disabled={refreshing||coolingDown} onClick={() => void refresh(true)}>{refreshing ? "갱신 중…" : "새로고침"}</button></div>
   {error && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">{error}{data && " 마지막 수신 위치를 유지하고 있습니다."}</p>}
   {data && !course && <p className="rounded-2xl border p-5">코스가 아직 등록되지 않았습니다. 운영진이 공식 거리와 코스 파일을 등록하면 추적이 시작됩니다.</p>}
   {data && <nav aria-label="추적 화면" className="tracking-view-nav">
@@ -98,7 +114,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
    <RunnerStatusList states={states}/>
   </section>}
   {data?.timing&&<p role="status" className="rounded-xl border border-zinc-200 p-3 text-xs leading-5">기록 연동{data.timing.collectionMode==="public-page"?" · 공개 페이지":""}: {data.timing.collectionMode!=="public-page"&&!data.timing.credentialsReady?"API 인증 설정 필요":!data.timing.enabled?"중지":!data.timing.courseCode?"현재 종목 연결 필요":data.timing.status==="synced"?"수집 응답 확인":data.timing.status==="partial"?"일부 기록 확인 필요":data.timing.status==="auth-required"?"기록 페이지 접근 제한":data.timing.status==="rate-limit"?"제공처 요청 제한":data.timing.status==="error"?"연결 확인 필요":"계측 수집 대기"}{data.timing.lastSyncedAt&&` · 최근 수집 ${new Date(data.timing.lastSyncedAt).toLocaleTimeString("ko-KR",{timeZone:"Asia/Seoul"})}`}</p>}
-  {pane==="admin"&&data?.canManage&&<TimingSourcePanel key={`${data.timing?.sourceUrl??""}:${data.timing?.courseCode??""}`} raceId={scheduleId} timing={data.timing} onSaved={load}/>}
+  {pane==="admin"&&data?.canManage&&<TimingSourcePanel key={scheduleId} raceId={scheduleId} courseName={data.course?.name} courses={data.courses} timing={data.timing} onSaved={load}/>}
   {pane==="admin"&&data?.canManage && <section aria-label="실제 추적 준비 상태" className="rounded-2xl border border-zinc-200 bg-white p-4">
    <h2 className="text-sm font-bold">실제 추적 준비 상태</h2>
    <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
@@ -107,7 +123,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
     <li className="rounded-xl bg-zinc-50 p-3">{Object.values(data.checkpoints).some(records => records.length) ? "✓" : "○"} 계측 기록 {Object.values(data.checkpoints).reduce((sum, records) => sum + records.length, 0)}개</li>
    </ul>
    <p className="mt-3 text-xs leading-5 text-zinc-600">{!data.runners.length ? "다음 단계: 선수 등록 탭에서 이름과 배번호를 등록해주세요." : !Object.values(data.checkpoints).some(records => records.length) ? "다음 단계: 실제 확인한 START 또는 계측소 통과 기록을 입력해주세요. 현재 위치는 예정 출발과 그룹 페이스 기준입니다." : "계측 기록이 연결되어 있습니다. 다른 기기에서 최근 계측 기록이 반영되는지 확인해주세요."}</p>
-   <p className="mt-2 text-xs leading-5 text-zinc-500">화면 기록은 15초마다 갱신 · 공개 기록 자동 수집은 종목 연결 후 동작 · GPS 위치 아님</p>
+   <p className="mt-2 text-xs leading-5 text-zinc-500">화면 기록은 출발 후 3분마다 갱신 · 수동 갱신은 최소 1분 간격 · 공개 기록 자동 수집은 종목 연결 후 동작 · GPS 위치 아님</p>
   </section>}
   {pane==="admin"&&data?.canManage && data.eventId && <details className="rounded-2xl border border-zinc-200 p-4"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">같은 대회에 종목 추가</summary><p className="text-sm text-zinc-500">종목마다 별도의 거리·출발 시간·GPX를 등록합니다.</p><RaceRegistrationForm parentRaceId={data.eventId} eventName={data.title}/></details>}
 
@@ -132,7 +148,7 @@ function RaceForms({ data, write, mode }: { data: RaceSnapshot; write: (payload:
  async function submit(event: FormEvent<HTMLFormElement>, payload: (form: FormData) => RaceWrite) {
   event.preventDefault(); if (busy) return;
   setBusy(true); setMessage("");
-  try { await write(payload(new FormData(event.currentTarget))); setMessage("저장했습니다."); }
+  try { const request=payload(new FormData(event.currentTarget));await write(request);if(request.action==="entry-delete"||request.action==="entry-move")setEditingEntry("");setMessage("저장했습니다."); }
   catch(e) { setMessage(e instanceof Error ? e.message : "저장하지 못했습니다."); }
   finally { setBusy(false); }
  }
@@ -149,15 +165,20 @@ function RaceForms({ data, write, mode }: { data: RaceSnapshot; write: (payload:
    <label className="block text-sm">공식 코스 파일 (GPX / GeoJSON)<input required type="file" accept=".gpx,.geojson,.json" className={inputClass} onChange={async e => { setPoints(null); setFileName(""); const file = e.target.files?.[0]; if (!file) return; try { if (file.size>2000000) throw new Error("코스 파일은 2MB 이하로 선택해주세요."); const source = await file.text(); const c = file.name.toLowerCase().endsWith(".gpx") ? courseFromGPX(source) : courseFromGeoJSON(JSON.parse(source)); if (c.points.length>20000) throw new Error("코스 좌표는 최대 20,000개입니다."); setPoints(c.points); setFileName(`${file.name} · ${c.points.length}개 좌표 · 좌표 거리 ${(c.measuredMeters/1000).toFixed(3)}km`); setMessage(""); } catch(e) { setMessage(e instanceof Error ? e.message : "파일을 읽지 못했습니다."); } }}/></label>
    {fileName && <p className="text-xs text-zinc-600">{fileName}</p>}<button disabled={busy || !points} className={buttonClass}>코스 저장</button>
   </form>}
-  {mode==="admin"&&data.canManage&&<form className="space-y-3 rounded-xl bg-zinc-50 p-4" onSubmit={e=>void submit(e,f=>({action:"group",name:String(f.get("groupName")),paceSeconds:Number(f.get("minutes"))*60+Number(f.get("seconds"))}))}>
+  {mode==="admin"&&data.canManage&&<form className="space-y-3 rounded-xl bg-zinc-50 p-4" onSubmit={e=>void submit(e,f=>({action:"group",name:String(f.get("groupName")),paceSeconds:Number(f.get("minutes"))*60+Number(f.get("seconds")),...(f.get("groupCourse")?{courseId:String(f.get("groupCourse"))}:{})}))}>
    <h3 className="font-bold">그룹 평균 페이스 등록</h3><p className="text-xs leading-5 text-zinc-500">첫 5km 계측 전에는 그룹 페이스로 예측합니다. 등록한 그룹은 기록 기준 보존을 위해 수정하지 않습니다. 다른 페이스는 새 그룹으로 등록해주세요.</p>
+   {!!data.courses?.length&&<label className="block text-sm">그룹을 등록할 코스<select name="groupCourse" defaultValue={data.raceId} className={inputClass}>{data.courses.map(c=><option key={c.raceId} value={c.raceId}>{c.name} · {c.distanceMeters/1000}km</option>)}</select></label>}
    <label className="block text-sm">그룹 이름<input required name="groupName" maxLength={40} placeholder="예: B그룹" className={inputClass}/></label>
    <div className="grid grid-cols-2 gap-3"><label className="text-sm">분/km<input required name="minutes" type="number" min={2} max={20} defaultValue={5} className={inputClass}/></label><label className="text-sm">초<input required name="seconds" type="number" min={0} max={59} defaultValue={0} className={inputClass}/></label></div>
    <button disabled={busy} className={buttonClass}>그룹 등록</button>
    <ul className="space-y-2 text-sm">{data.groups?.map(g=><li key={g.groupId}>{g.name} · {Math.floor(g.paceSeconds/60)}:{String(g.paceSeconds%60).padStart(2,"0")}/km</li>)}</ul>
   </form>}
-  {mode==="entries"&&!data.groups?.length&&<p className="text-sm text-zinc-500">선수 등록 전에 관리자가 이 종목의 그룹을 등록해야 합니다.</p>}
-  {mode==="entries" && data.course && <form className="space-y-3 rounded-xl bg-zinc-50 p-4" onSubmit={e => void submit(e, f => ({ action:"entry", runnerName:String(f.get("runnerName")), ...(editingEntry ? {entryId:editingEntry} : {}), bib:String(f.get("bib")), targetPaceSeconds:null,groupId:String(f.get("group")) }))}><h3 className="font-bold">선수 정보 입력</h3><label className="block text-sm">등록 구분<select value={editingEntry} onChange={e=>setEditingEntry(e.target.value)} className={inputClass}><option value="">새 선수 등록</option>{data.runners.map(r=><option key={r.id} value={r.id}>{r.name} · #{r.bib} 수정</option>)}</select></label><label className="block text-sm">선수 이름<input key={editingEntry+"name"} required name="runnerName" maxLength={50} defaultValue={editRunner?.name??""} placeholder="선수 이름을 입력해주세요" className={inputClass}/></label><label className="block text-sm">배번호<input key={editingEntry+"bib"} defaultValue={editRunner?.bib??""} required name="bib" maxLength={20} pattern="[A-Za-z0-9-]+" className={inputClass}/></label><label className="block text-sm">소속 그룹<select required name="group" className={inputClass}><option value="">그룹 선택</option>{data.groups?.map(g=><option key={g.groupId} value={g.groupId}>{g.name} · {Math.floor(g.paceSeconds/60)}:{String(g.paceSeconds%60).padStart(2,"0")}/km</option>)}</select></label><p className="text-xs text-zinc-500">출발 이후 또는 계측 기록 등록 후 기존 배번호·그룹 수정은 잠깁니다.</p><button disabled={busy} className={buttonClass}>{editingEntry?"선수 정보 수정":"선수 등록"}</button></form>}
+  {mode==="entries"&&!data.groups?.length&&<p className="text-sm text-zinc-500">그룹 없이 등록할 수 있습니다. 그룹 미지정은 기본 6:00/km로 예측하다가 실제 구간 계측이 들어오면 실측 페이스로 전환합니다.</p>}
+  {mode==="entries" && data.course && <form className="space-y-3 rounded-xl bg-zinc-50 p-4" onSubmit={e => void submit(e, f => ({ action:"entry", runnerName:String(f.get("runnerName")), ...(editingEntry ? {entryId:editingEntry} : {}), bib:String(f.get("bib")), targetPaceSeconds:null,groupId:String(f.get("group"))||null }))}><h3 className="font-bold">선수 정보 입력</h3><label className="block text-sm">등록 구분<select value={editingEntry} onChange={e=>setEditingEntry(e.target.value)} className={inputClass}><option value="">새 선수 등록</option>{data.runners.map(r=><option key={r.id} value={r.id}>{r.name} · #{r.bib} 수정</option>)}</select></label><label className="block text-sm">선수 이름<input key={editingEntry+"name"} required name="runnerName" maxLength={50} defaultValue={editRunner?.name??""} placeholder="선수 이름을 입력해주세요" className={inputClass}/></label><label className="block text-sm">배번호<input key={editingEntry+"bib"} defaultValue={editRunner?.bib??""} required name="bib" maxLength={20} pattern="[A-Za-z0-9-]+" className={inputClass}/></label><label className="block text-sm">소속 그룹<select key={editingEntry+"group"} name="group" defaultValue={data.groups?.find(g=>g.name===editRunner?.groupName)?.groupId??""} className={inputClass}><option value="">그룹 미지정 · 초기 6:00/km 예측</option>{data.groups?.map(g=><option key={g.groupId} value={g.groupId}>{g.name} · {Math.floor(g.paceSeconds/60)}:{String(g.paceSeconds%60).padStart(2,"0")}/km</option>)}</select></label><p className="text-xs text-zinc-500">계측 기록이 있는 선수의 배번호·그룹 수정은 잠깁니다. 잘못된 선수는 아래에서 삭제하거나 다른 코스로 옮겨 등록할 수 있습니다.</p><button disabled={busy} className={buttonClass}>{editingEntry?"선수 정보 수정":"선수 등록"}</button></form>}
+  {mode==="entries"&&editRunner&&<section aria-label="선수 삭제와 코스 변경" className="space-y-4 rounded-xl border border-zinc-200 p-4"><h3 className="font-bold">{editRunner.name} · #{editRunner.bib} 등록 정정</h3><p className="text-sm text-zinc-600">삭제한 선수와 기존 계측은 보관되며 화면과 수집 대상에서 제외됩니다. 코스를 옮기면 새 코스에서 계측을 다시 수집합니다.</p>
+   <form onSubmit={e=>void submit(e,()=>({action:"entry-delete",entryId:editingEntry}))}><button disabled={busy} className={buttonClass}>선수 삭제</button></form>
+   {!!data.courses?.some(c=>c.raceId!==data.raceId)&&<form className="space-y-3" onSubmit={e=>void submit(e,f=>({action:"entry-move",entryId:editingEntry,courseId:String(f.get("destination")),groupId:null}))}><label className="block text-sm">이동할 코스<select required name="destination" className={inputClass}>{data.courses.filter(c=>c.raceId!==data.raceId).map(c=><option key={c.raceId} value={c.raceId}>{c.name} · {c.distanceMeters/1000}km</option>)}</select></label><p className="text-xs text-zinc-500">이동한 코스에서는 그룹 미지정으로 등록됩니다. 해당 코스의 선수 등록 페이지에서 그룹을 지정할 수 있습니다.</p><button disabled={busy} className={buttonClass}>코스 변경</button></form>}
+  </section>}
   {mode==="admin" && data.canManage && data.entries.length>0 && <div className="space-y-4 rounded-xl bg-zinc-50 p-4"><label className="block text-sm">계측 대상 선수<select value={chosenEntry} onChange={e => setEntryChoice(e.target.value)} className={inputClass}>{data.entries.map(e => <option key={e.entryId} value={e.entryId}>{data.runners.find(r => r.id===e.entryId)?.name} · BIB {e.bib}</option>)}</select></label>
    <form className="space-y-3" onSubmit={e => void submit(e,f => ({ action:"checkpoint", entryId:chosenEntry, name:String(f.get("name")), distanceMeters:Number(f.get("distance"))*1000, passedAt:date(f.get("passed")) }))}><h3 className="font-bold">통과 기록 입력</h3><p className="text-xs text-zinc-500">실제 확인한 기록만 입력해주세요. START는 0km, FINISH는 공식 거리입니다. 기록은 거리·시각 순서대로 입력하며, 저장 후 이 화면에서는 변경할 수 없습니다.</p><label className="block text-sm">지점 이름<input required maxLength={40} name="name" placeholder="START / 5K / FINISH" className={inputClass}/></label><label className="block text-sm">통과 거리 (km)<input required type="number" name="distance" min={0} max={data.course!.distanceMeters/1000} step="0.001" className={inputClass}/></label><label className="block text-sm">통과 시각 (기기 시간대)<input required type="datetime-local" step={1} name="passed" className={inputClass}/></label><button disabled={busy} className={buttonClass}>통과 기록 저장</button></form>
    <form className="space-y-3 border-t pt-4" onSubmit={e => void submit(e, f => ({ action:"status", entryId:chosenEntry, status:String(f.get("status")) as "running"|"dnf"|"dns" }))}><h3 className="font-bold">출전 상태</h3><select name="status" aria-label="출전 상태" className={inputClass}><option value="running">주행</option><option value="dnf">중도 포기 (DNF)</option><option value="dns">미출발 (DNS)</option></select><button disabled={busy} className={buttonClass}>상태 저장</button></form>

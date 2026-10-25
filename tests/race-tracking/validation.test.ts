@@ -1,7 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validateRaceWrite } from "../../src/lib/race-tracking/validation";
+import {nextTrackingRefresh,canRefreshTracking} from "../../src/lib/race-tracking/refresh-policy";
 const id = "22222222-2222-4222-8222-222222222222";
+test("refresh follows race-start three-minute boundaries and a silent one-minute cooldown",()=>{
+ const start=Date.parse('2026-10-25T09:00:00+09:00');
+ assert.equal(nextTrackingRefresh(new Date(start).toISOString(),start-1),start);
+ assert.equal(nextTrackingRefresh(new Date(start).toISOString(),start+1),start+180000);
+ assert.equal(nextTrackingRefresh(new Date(start).toISOString(),start+180000),start+360000);
+ assert.equal(canRefreshTracking(start+59999,start),false);
+ assert.equal(canRefreshTracking(start+60000,start),true);
+});
+test("registration permits an unspecified group and validates correction actions",()=>{
+ const e=validateRaceWrite({action:'entry',runnerName:'외부 선수',bib:'3987',groupId:null,targetPaceSeconds:null});
+ assert.equal(e.action,'entry');if(e.action==='entry')assert.equal(e.groupId,null);
+ assert.deepEqual(validateRaceWrite({action:'entry-delete',entryId:id}),{action:'entry-delete',entryId:id});
+ assert.deepEqual(validateRaceWrite({action:'entry-move',entryId:id,courseId:id}),{action:'entry-move',entryId:id,courseId:id,groupId:null});
+ assert.throws(()=>validateRaceWrite({action:'entry-move',entryId:id,courseId:'fake'}));
+});
 const course = { action:"course", name:"서울레이스", distanceMeters:42195, startAt:"2026-10-11T08:00:00+09:00", points:[{latitude:37.5,longitude:127},{latitude:37.51,longitude:127.01}] };
 test("registers a typed runner name without a member account",()=>{
  const input={action:"entry",runnerName:"  외부 선수  ",bib:"003987",groupId:id,targetPaceSeconds:null};
