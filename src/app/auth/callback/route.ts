@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
+  if(url.searchParams.get('flow')==='account-help'){
+    const result=code?await(await createSupabaseServerClient()).auth.exchangeCodeForSession(code):null;
+    return NextResponse.redirect(new URL(result&&!result.error?'/auth/account-help':'/auth/account-help?error=link',url.origin),{headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});
+  }
   if (url.searchParams.get("flow") === "email-change") {
     // An unrelated session may already exist in the browser opening the email.
     // Show the outcome without sending that session to its dashboard via /login.

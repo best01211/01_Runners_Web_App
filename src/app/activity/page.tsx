@@ -1,0 +1,21 @@
+import Link from 'next/link';
+import {redirect} from 'next/navigation';
+import {getCurrentPageProfile} from '@/lib/auth/current-user';
+import {canUseService} from '@/lib/auth/account-access';
+import {createSupabaseAdminClient} from '@/lib/supabase/admin';
+import {attendanceLabels} from '@/lib/member-directory';
+import {DEFAULT_SCORE_POLICY,parseScorePolicy} from '@/lib/ranking';
+export const metadata={title:'내 출석·활동 내역 | 2001 Runners'};
+export default async function Page({searchParams}:{searchParams:Promise<{page?:string;status?:string}>}){
+ const p=await getCurrentPageProfile();if(!p||!canUseService(p))redirect('/login');
+ const params=await searchParams,page=Math.max(1,Math.min(100000,Number.parseInt(params.page??'1')||1));
+ const status=Object.hasOwn(attendanceLabels,params.status??'')?params.status!:'all';
+ const a=createSupabaseAdminClient();let query=a.from('attendances').select('attendance_id,schedule_id,status,method,checked_at,created_at,schedules:schedule_id(title,start_at,status,deleted_at)',{count:'exact'}).eq('user_id',p.user_id);
+ if(status!=='all')query=query.eq('status',status);
+ const [result,setting]=await Promise.all([query.order('created_at',{ascending:false}).order('attendance_id').range((page-1)*20,page*20-1),a.from('system_settings').select('setting_value').eq('setting_key','score_policy').maybeSingle()]);
+ if(result.error||setting.error)return <main><h1>내 활동 내역</h1><p>활동 내역을 불러오지 못했습니다.</p><Link href="/activity">다시 시도</Link></main>;
+ const policy=setting.data?parseScorePolicy(setting.data.setting_value):DEFAULT_SCORE_POLICY;
+ const ids=(result.data??[]).map(r=>r.schedule_id),pacers=new Set<string>();let pacerLoaded=true;
+ if(ids.length){const {data,error}=await a.from('schedule_participations').select('schedule_id').eq('user_id',p.user_id).eq('is_pacer',true).in('schedule_id',ids);if(error)pacerLoaded=false;else for(const r of data??[])pacers.add(r.schedule_id);}
+ return <main className="mx-auto max-w-3xl space-y-5 px-4 py-6"><h1 className="text-2xl font-bold">내 출석·활동 내역</h1><p>내 출석 상태와 인증 시각을 확인하세요. 기록이 다르면 해당 일정의 운영진에게 정정을 요청해주세요.</p><div className="flex flex-wrap gap-2"><Link className="button-secondary" href="/my-schedules">내 신청 일정</Link><Link className="button-secondary" href="/notifications">일정·답글 알림</Link></div><form className="flex gap-2"><label className="min-w-0 flex-1">출석 상태<select name="status" defaultValue={status} className="input mt-1"><option value="all">전체</option>{Object.entries(attendanceLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><button className="button-secondary self-end">조회</button></form><p className="text-sm">총 {result.count??0}건 · 최신 등록순 · {page}페이지</p>{(result.data??[]).map(r=>{const s=Array.isArray(r.schedules)?r.schedules[0]:r.schedules;const excluded=!s||s.deleted_at||s.status==='cancelled';const base=policy&&['attended','late','absent'].includes(r.status)?policy[r.status as 'attended'|'late'|'absent']:0;const score=excluded?0:base+(policy&&['attended','late'].includes(r.status)&&pacers.has(r.schedule_id)?policy.pacer:0);return <article key={r.attendance_id} className="space-y-2 rounded-xl border bg-white p-4">{s&&!s.deleted_at?<Link href={`/schedules/${r.schedule_id}`} className="font-bold">{s.title}</Link>:<strong>{s?.title??'일정 정보 없음'}</strong>}<p>{s&&new Date(s.start_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})}{excluded?' · 취소·삭제되어 점수 제외':''}</p><p><strong>{attendanceLabels[r.status]??r.status}</strong> · {policy&&pacerLoaded?`참고 점수 ${score}점`:'점수 정책 확인 필요'}</p><p className="text-sm text-zinc-500">{r.checked_at?`확인 시각 ${new Date(r.checked_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})}`:'아직 출석이 확인되지 않았어요.'}{r.method==='code'?' · 출석번호 인증':r.method==='manual'?' · 운영진 확인':''}</p></article>;})}{!result.data?.length&&<p className="rounded-xl border p-5">선택한 상태의 출석 기록이 없어요. 참가한 일정의 출석이 시작되면 기록이 표시됩니다.</p>}<p className="text-xs text-zinc-500">참고 점수는 현재 출석·페이서 점수 정책 기준입니다. 실제 랭킹 집계는 시즌과 회원 자격을 따릅니다.</p><nav className="flex justify-between" aria-label="활동 내역 페이지">{page>1?<Link href={`/activity?page=${page-1}&status=${status}`}>← 이전</Link>:<span/>}{page*20<(result.count??0)&&<Link href={`/activity?page=${page+1}&status=${status}`}>다음 →</Link>}</nav></main>;
+}

@@ -36,8 +36,11 @@ export function AttendancePanel({ startAt, scheduleId, canManage,paceGroups=[],e
     finally {setBusy(false)}
   }
   function check(event:FormEvent<HTMLFormElement>){event.preventDefault();void act({action:"check",code:new FormData(event.currentTarget).get("code")})}
-  return <section className="attendance-card mt-8 rounded-2xl border p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">출석</h2>{canManage&&<button type="button" className="button-secondary" onClick={()=>setRosterOpen(value=>!value)} aria-expanded={rosterOpen}>{rosterOpen?"명단 닫기":"출석 · 참가 명단"}</button>}</div>
+  return <section id="attendance" style={{scrollMarginTop:100}} className="attendance-card mt-8 rounded-2xl border p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">출석</h2>{canManage&&<button type="button" className="button-secondary" onClick={()=>setRosterOpen(value=>!value)} aria-expanded={rosterOpen}>{rosterOpen?"명단 닫기":"출석 · 참가 명단"}</button>}</div>
     {!started&&<p className="mt-4 text-sm text-zinc-500">일정 시작 시각부터 출석할 수 있습니다.</p>}
+    {loaded&&started&&!open&&!closed&&!canManage&&<p className="mt-3 text-sm">운영진이 출석을 열기를 기다리고 있어요. 출석이 열리면 현장 운영진에게 받은 4자리 번호를 입력해주세요.</p>}
+    {open&&!closed&&!canManage&&<p className="mt-3 text-sm">현장 운영진에게 받은 4자리 출석번호를 입력하고 인증을 눌러주세요. 신청 완료와 출석 인증은 별도입니다.</p>}
+    {loaded&&!canManage&&!rows.length&&<p className="mt-3 text-sm">참가 신청 여부를 먼저 확인해주세요. 신청했는데 기록이 없다면 현장 운영진에게 알려주세요.</p>}
     {!loaded&&<p role="status" className="mt-4 min-h-11 text-sm text-zinc-500">출석 정보를 불러오고 있습니다…</p>}
     {loaded&&canManage&&<div className="mt-4 flex flex-wrap gap-2">{closed?<span>출석 종료됨</span>:!open?<button disabled={busy||!started} onClick={()=>act({action:"open"})} className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white">출석 시작</button>:<><span className="rounded-xl bg-amber-50 px-4 py-2 font-black">번호 {code}</span><button disabled={busy||!started} onClick={()=>{if(confirm("미확인 참가자는 불참으로 처리됩니다. 출석을 종료할까요?"))void act({action:"close"},"PATCH")}} className="rounded-xl bg-zinc-900 px-4 py-2 font-bold text-white">출석 종료</button></>}</div>}
     {loaded&&!canManage&&<p className="mt-4" aria-live="polite">내 출석: {rows[0]?labels[rows[0].status] ?? rows[0].status:"출석 기록 없음"}{closed&&" · 출석 종료"}</p>}

@@ -4,6 +4,7 @@ import { getCurrentProfile } from "@/lib/auth/current-user";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { parseScorePolicy } from "@/lib/ranking";
 import {parseMaintenanceSetting} from "@/lib/service-policy";
+import {validSupportLink} from '@/lib/support-link';
 export async function GET() {
  const p = await getCurrentProfile();
  if (!p || !canAdminister(p)) return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
@@ -15,10 +16,13 @@ export async function PUT(request: Request) {if (request.headers.get("origin") !
  if (!p || !canAdminister(p)) return fail("FORBIDDEN", "관리자 권한이 필요합니다.", 403);
  let body;
  try { body = await request.json(); } catch { return fail("INVALID_JSON", "입력값을 확인해주세요."); }
- if (!body || !["maintenance", "score_policy"].includes(body.key)) return fail("INVALID_KEY", "설정 항목이 올바르지 않습니다.");
+ if (!body || !["maintenance", "score_policy","member_help"].includes(body.key)) return fail("INVALID_KEY", "설정 항목이 올바르지 않습니다.");
  if(body.key==="maintenance"&&p.role!=="admin")return fail("FORBIDDEN","서비스 운영 설정은 관리자만 변경할 수 있습니다.",403);
  let value = body.value;
- if (body.key === "score_policy") {
+ if(body.key==='member_help'){
+  if(p.role!=='admin')return fail('FORBIDDEN','관리자만 문의 링크를 변경할 수 있습니다.',403);
+  const url=validSupportLink(body.value?.url);if(url===undefined)return fail('INVALID_URL','HTTPS 주소 또는 mailto:이메일을 입력해주세요.');value={url};
+ }else if (body.key === "score_policy") {
   value = parseScorePolicy(value);
   if (!value) return fail("INVALID_POLICY", "점수와 최소 활동은 0~100000 정수여야 합니다.");
  } else {value=parseMaintenanceSetting(value);if(!value)return fail("INVALID_STATUS","서비스 상태·제한 항목·허용 등급·시간을 확인해주세요. 관리자 접속은 차단할 수 없습니다.");}

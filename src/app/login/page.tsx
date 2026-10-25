@@ -49,7 +49,7 @@ function LoginForm() {
 
       const nextPath = safeNextPath(searchParams.get("next"));
 
-      router.replace(nextPath);
+      router.replace(result.data?.nextPath??nextPath);
       router.refresh();
     } catch {
       setErrorMessage("서버와 통신하는 중 오류가 발생했습니다.");
@@ -127,11 +127,12 @@ function LoginForm() {
             {isSubmitting ? "로그인 중..." : <>로그인<Icon name="arrow" size={18}/></>}
           </button>
         </form>
-        {searchParams.get("signup") === "complete" && <p className="mt-4 text-sm text-emerald-700">가입 신청이 완료되었습니다. 이메일 확인이 필요한 경우 메일의 링크를 열어주세요. 운영진 승인 후 로그인할 수 있습니다.</p>}
+        {searchParams.get("signup") === "complete" && <p className="mt-4 text-sm text-emerald-700">가입 신청을 접수했어요. 받은 인증 메일을 먼저 확인해주세요. 로그인하면 운영진 승인 상태를 확인할 수 있습니다.</p>}
         {searchParams.get("confirmed") === "1" && <p className="mt-4 text-sm text-emerald-700">이메일 인증이 완료되었습니다.</p>}
         {searchParams.get("authError") && <p role="alert" className="mt-4 text-sm text-red-600">인증 링크가 만료되었거나 사용할 수 없습니다.</p>}
         <div className="login-signup"><span>아직 크루 회원이 아닌가요?</span><Link href="/signup">가입 신청<Icon name="arrow" size={14}/></Link></div>
         <Link href="/auth/forgot-password" className="mt-5 block text-center text-sm text-zinc-500 hover:text-emerald-700">비밀번호를 잊으셨나요?</Link>
+        <Link href="/auth/account-help" className="mt-4 block text-center text-sm font-semibold text-emerald-700">아이디·가입 승인 상태 찾기</Link>
       </section><p className="login-bottom-note">2001 RUNNERS · 회원 전용</p></div>
     </main>
   );

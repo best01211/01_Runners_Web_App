@@ -11,6 +11,13 @@ body,.app-shell { background:var(--crew-paper); color:var(--crew-ink); }
 .account-avatar { background:#e8ebdf; border-color:var(--crew-line); }
 .main-body>main { padding-top:40px; }
 .main-body>main.dashboard-page { max-width:1160px; gap:32px; padding-top:28px; }
+.dashboard-my-section { min-width:0; order:-1; }
+@media(min-width:1024px){
+ .dashboard-page:has(.dashboard-my-section)>.dashboard-my-section{grid-column:1/-1;grid-row:1}
+ .dashboard-page:has(.dashboard-my-section)>.dashboard-intro{grid-row:2}
+ .dashboard-page:has(.dashboard-my-section)>.dashboard-next,.dashboard-page:has(.dashboard-my-section)>.dashboard-personal{grid-row:3}
+ .dashboard-page:has(.dashboard-my-section)>.dashboard-upcoming,.dashboard-page:has(.dashboard-my-section)>.dashboard-activities{grid-row:4}
+}
 .dashboard-intro.crew-intro { position:relative; overflow:hidden; padding:28px 32px 20px; background:var(--crew-ink); color:#fff; border-radius:24px; }
 .crew-intro-top,.crew-intro-bottom { display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .crew-eyebrow { display:inline-flex; align-items:center; gap:9px; color:#e5e9db; font-size:11px; font-weight:650; letter-spacing:1.7px; }

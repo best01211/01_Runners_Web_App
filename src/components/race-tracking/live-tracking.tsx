@@ -32,6 +32,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  const mounted = useRef(false);
  const lastRefresh=useRef(-Infinity),refreshActive=useRef(false);
  const [coolingDown,setCoolingDown]=useState(false);
+ const [cooldownSeconds,setCooldownSeconds]=useState(0);
  const load = useCallback(async () => {
   if (activeRequest.current) return;
   const controller = new AbortController(); activeRequest.current = controller;
@@ -59,7 +60,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  useEffect(() => {
   mounted.current = true;
   if(initialData)anchor.current={now:Date.parse(initialData.serverNow),at:performance.now(),healthy:true};else void load();
-  const tick = setInterval(() => { const a = anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();if(a?.healthy)setNow(clock);setCoolingDown(!canRefreshTracking(clock,lastRefresh.current)); }, 1000);
+  const tick = setInterval(() => { const a = anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();if(a?.healthy)setNow(clock);setCoolingDown(!canRefreshTracking(clock,lastRefresh.current));setCooldownSeconds(Math.max(0,Math.ceil((60000-clock+lastRefresh.current)/1000))); }, 1000);
   return () => { mounted.current = false; activeRequest.current?.abort(); activeRequest.current = null; clearInterval(tick); };
  }, [load,initialData]);
  const automatic=!!(data?.timing?.enabled&&(data.timing.collectionMode==="public-page"||data.timing.credentialsReady)&&data.timing.courseCode);
@@ -67,7 +68,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  const refresh=useCallback(async(manual:boolean)=>{
   const a=anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();
   if(refreshActive.current||!canRefreshTracking(clock,lastRefresh.current))return;
-  lastRefresh.current=clock;refreshActive.current=true;setCoolingDown(true);setRefreshing(true);
+  lastRefresh.current=clock;refreshActive.current=true;setCoolingDown(true);setCooldownSeconds(60);setRefreshing(true);
   try{
    if(automatic&&startAt&&clock>=Date.parse(startAt)){
     const r=await fetch(endpoint+"/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({manual}),cache:"no-store",signal:AbortSignal.timeout(55000)});
@@ -100,7 +101,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  }
  return <div className="mt-4 space-y-4 text-zinc-900">
   <header className="border-b border-zinc-200 p-4"><p className="text-sm font-bold text-zinc-600">대회 선수 추적 · 계측 기반 예측</p><h1 className="mt-2 break-words text-2xl font-black sm:text-3xl">{title}</h1>{data?.course&&<p className="mt-2 text-sm text-zinc-500">{data.course.name} · {new Date(data.course.startAt).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})} 출발</p>}{!data?.course && <p className="mt-3 text-sm leading-6">계측 기록으로 계산한 예상 위치입니다. GPS 실측 위치가 아닙니다.</p>}</header>
-  <div className="flex items-center justify-between gap-3 px-1"><p className="min-w-0 text-xs leading-5 text-zinc-500">{data ? `마지막 수신: ${new Date(data.serverNow).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })} · 출발 후 3분마다 갱신` : "추적 정보를 불러오는 중입니다."}</p><button className="min-h-11 shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-40" disabled={refreshing||coolingDown} onClick={() => void refresh(true)}>{refreshing ? "갱신 중…" : "새로고침"}</button></div>
+  <div className="flex items-center justify-between gap-3 px-1"><p className="min-w-0 text-xs leading-5 text-zinc-500">{data ? `마지막 수신: ${new Date(data.serverNow).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })} · 출발 후 3분마다 갱신` : "추적 정보를 불러오는 중입니다."}</p><button className="min-h-11 shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-40" aria-label="새로고침" aria-describedby={coolingDown?"refresh-wait":undefined} disabled={refreshing||coolingDown} onClick={() => void refresh(true)}>{refreshing ? "갱신 중…" : coolingDown?<span id="refresh-wait">{cooldownSeconds}초 후 갱신 가능</span>:"새로고침"}</button></div>
   {error && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">{error}{data && " 마지막 수신 위치를 유지하고 있습니다."}</p>}
   {data && !course && <p className="rounded-2xl border p-5">코스가 아직 등록되지 않았습니다. 운영진이 공식 거리와 코스 파일을 등록하면 추적이 시작됩니다.</p>}
   {data && <nav aria-label="추적 화면" className="tracking-view-nav">

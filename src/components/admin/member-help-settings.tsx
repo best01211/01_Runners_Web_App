@@ -1,0 +1,6 @@
+'use client';
+import {useState} from 'react';
+export function MemberHelpSettings({initialUrl}:{initialUrl:string|null}){
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
+ return <form className="mt-6 space-y-4 rounded-2xl border p-5" onSubmit={async e=>{e.preventDefault();if(busy)return;const url=String(new FormData(e.currentTarget).get('url')??'').trim();setBusy(true);setMessage('');try{const r=await fetch('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'member_help',value:{url:url||null}})});const j=await r.json();if(!r.ok)throw Error(j.error?.message??'저장하지 못했습니다.');setMessage(url?'가입·승인 안내에 문의 링크가 표시됩니다.':'문의 링크를 숨겼습니다. 문의 문구 복사는 계속 사용할 수 있습니다.');}catch(e){setMessage(e instanceof Error?e.message:'연결하지 못했습니다.');}finally{setBusy(false);}}}><h2 className="text-lg font-bold">가입·승인 문의 링크</h2><p className="text-sm">나중에 카카오 오픈채팅 등의 HTTPS 주소 또는 mailto:이메일을 입력하세요. 비워두면 링크 없이 운영진 문의 안내와 문구 복사만 표시합니다.</p><label className="block text-sm">문의 주소<input name="url" type="url" maxLength={2048} defaultValue={initialUrl??''} placeholder="https://open.kakao.com/..." className="input mt-1"/></label><button disabled={busy} className="button-primary">{busy?'저장 중…':'문의 링크 저장'}</button>{message&&<p role="status">{message}</p>}</form>;
+}

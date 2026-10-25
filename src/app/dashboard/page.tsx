@@ -1,4 +1,5 @@
 import {Suspense} from "react";
+import {MyNextSchedule} from '@/components/dashboard/my-next-schedule';
 import {measure} from "@/lib/performance";
 import {redirect} from "next/navigation";
 import {getCurrentPageProfile as getCurrentProfile} from "@/lib/auth/current-user";
@@ -23,6 +24,7 @@ export default async function DashboardPage() {
  const schedules=measure("page.dashboard.schedules",()=>loadUpcomingSchedules(now,false)).then(data=>({data,error:false}),()=>({data:[],error:true}));
  const activity=measure("page.dashboard.activity",()=>loadRanking(undefined,canAdminister(profile),profile.user_id)).catch(()=>null);
  return <DashboardView profile={profile} now={now} schedules={[]}
+  mySection={<Suspense fallback={pending("dashboard-next")}><MyNextSchedule userId={profile.user_id} now={now}/></Suspense>}
   nextSection={<Suspense fallback={pending("dashboard-next")}><ScheduleSection result={schedules} now={now}/></Suspense>}
   personalSection={<Suspense fallback={pending("dashboard-personal")}><PersonalSection result={activity}/></Suspense>}
   upcomingSection={<Suspense fallback={pending("dashboard-upcoming")}><ScheduleSection result={schedules} now={now} upcoming/></Suspense>}/>;

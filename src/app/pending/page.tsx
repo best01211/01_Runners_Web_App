@@ -1,3 +1,5 @@
+import {ApprovalHelp,PendingRefresh} from "@/components/auth/account-help";
+import {loadCrewSupportUrl} from "@/lib/crew-support";
 import { redirect } from "next/navigation";
 import { getCurrentPageProfile as getCurrentProfile } from "@/lib/auth/current-user";
 
@@ -20,8 +22,9 @@ export default async function PendingPage() {
         <dl className="mt-8 space-y-4 rounded-2xl bg-zinc-50 p-5 text-sm">
           <div className="flex justify-between"><dt>아이디</dt><dd className="font-medium">{profile.login_id}</dd></div>
           <div className="flex justify-between"><dt>이름</dt><dd className="font-medium">{profile.name}</dd></div>
-          <div className="flex justify-between"><dt>승인 상태</dt><dd className="font-medium">{profile.approval_status}</dd></div>
+          <div className="flex justify-between"><dt>승인 상태</dt><dd className="font-medium">{({pending:"승인 대기",approved:"승인 완료",rejected:"승인 거절",cancelled:"신청 취소"} as Record<string,string>)[profile.approval_status]??"운영진 확인 필요"}</dd></div>
         </dl>
+        <div className="mt-5 space-y-4"><p className="text-sm">이메일 인증과 운영진 승인은 별도 단계입니다. 인증 메일이 왔다면 링크를 먼저 확인해주세요.</p><PendingRefresh/><ApprovalHelp supportUrl={await loadCrewSupportUrl()}/></div>
         <form action="/api/auth/logout" method="post" className="mt-8">
           <button type="submit" className="w-full rounded-xl bg-zinc-950 px-4 py-3 font-semibold text-white">로그아웃</button>
         </form>

@@ -7,7 +7,7 @@ import {canAdminister,canStartActivity} from "@/lib/auth/account-access";
 import type {CurrentProfile} from "@/lib/auth/current-user";
 import type {PersonalActivity} from "@/lib/personal-activity";
 
-export function DashboardView({profile,schedules,now,scheduleError=false,activity=null,activityError=false,nextSection,personalSection,upcomingSection}:{nextSection?:ReactNode;personalSection?:ReactNode;upcomingSection?:ReactNode;profile:CurrentProfile;schedules:ScheduleSummary[];now:string;scheduleError?:boolean;activity?:PersonalActivity|null;activityError?:boolean}) {
+export function DashboardView({profile,schedules,now,scheduleError=false,activity=null,activityError=false,nextSection,personalSection,upcomingSection,mySection}:{mySection?:ReactNode;nextSection?:ReactNode;personalSection?:ReactNode;upcomingSection?:ReactNode;profile:CurrentProfile;schedules:ScheduleSummary[];now:string;scheduleError?:boolean;activity?:PersonalActivity|null;activityError?:boolean}) {
   schedules=selectUpcomingSchedules(schedules,now,false);
   const role=profile.role==='admin'?'관리자':profile.staff_position==='president'?'회장':profile.staff_position==='vice_president'?'부회장':profile.role==='staff'?'운영진':profile.role==='guest'?'게스트':'회원';
   const approval=profile.approval_status==='approved'?'승인 완료':'승인 대기';
@@ -19,6 +19,7 @@ export function DashboardView({profile,schedules,now,scheduleError=false,activit
       <div className="crew-intro-bottom"><span>각자의 속도로, 같은 방향으로.</span><div className="dashboard-account-state"><span>{role}</span><span>{approval}</span></div></div>
     </header>
     {profile.account_status==='restricted'&&<p className="service-notice">신규 활동이 제한된 계정입니다. 일정 조회·기존 참가 취소·출석 인증은 이용할 수 있습니다.</p>}
+    {mySection&&<div className="dashboard-my-section">{mySection}</div>}
     {nextSection??<DashboardNext schedules={schedules} now={now} scheduleError={scheduleError}/>}
     {personalSection??<DashboardPersonal activity={activity} activityError={activityError}/>}
     {upcomingSection??<DashboardUpcoming schedules={schedules} now={now} scheduleError={scheduleError}/>}

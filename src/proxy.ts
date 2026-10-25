@@ -46,7 +46,7 @@ async function runProxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   // Recovery routes must remain reachable even for pending or restricted accounts.
-  if (["/auth/forgot-password", "/auth/reset-password", "/auth/callback", "/auth/email-change"].includes(pathname)) return response;
+  if (["/auth/forgot-password", "/auth/reset-password", "/auth/callback", "/auth/email-change", "/auth/account-help"].includes(pathname)) return response;
 
   if (!user) {
     if (isPublicPath(pathname)) return response;

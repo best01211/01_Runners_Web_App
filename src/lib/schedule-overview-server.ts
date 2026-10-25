@@ -38,3 +38,14 @@ export async function loadScheduleHistoryOrMonth(now:string,month?:string):Promi
   if(error)throw new Error('일정 목록을 불러오지 못했습니다.');rows.push(...data as unknown as ScheduleSummary[]);if(data.length<500)break;
  }return rows;
 }
+
+/** Member browsing shows every upcoming schedule, not only the nearest of each type. */
+export async function loadAllUpcomingSchedules(now:string):Promise<ScheduleSummary[]>{
+ const rows:ScheduleSummary[]=[];
+ for(let offset=0;;offset+=500){
+  const {data,error}=await createSupabaseAdminClient().from('schedules').select(scheduleFields).is('deleted_at',null).neq('status','completed').neq('status','cancelled').or(`end_at.gte.${now},and(end_at.is.null,start_at.gte.${now})`).order('start_at').order('schedule_id').range(offset,offset+499);
+  if(error)throw new Error('예정 일정을 불러오지 못했습니다.');
+  rows.push(...data as unknown as ScheduleSummary[]);if((data?.length??0)<500)break;
+ }
+ return rows;
+}
