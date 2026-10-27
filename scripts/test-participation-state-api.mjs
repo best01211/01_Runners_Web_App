@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import Module,{createRequire} from 'node:module';import ts from 'typescript';
+const compile=(file,resolve)=>{const m=new Module(file);m.require=resolve;m._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,file);return m.exports;};
+const access=compile('src/lib/auth/account-access.ts',()=>{});
+let profile={role:'member',account_status:'active',approval_status:'approved',user_id:'me'};
+let schedule={status:'open',capacity:3,staff_in_capacity:false,registration_start_at:null,registration_end_at:'2099-01-01',cancellation_deadline_at:null,attendance_opened_at:null};
+const groups=[{pace_group_id:'g1',user_id:'me',profiles:{name:'Member',role:'member'}},{pace_group_id:'g1',user_id:'staff',profiles:[{name:'Staff',role:'staff'}]},{pace_group_id:'g2',user_id:'other',profiles:{name:'Other',role:'member'}}];
+const paceGroups=[{pace_group_id:'g1',pace_seconds:330,distance_km:5},{pace_group_id:'g2',pace_seconds:360,distance_km:5}];
+let scheduleError=null;
+const {GET}=compile('src/app/api/schedules/[scheduleId]/participation/route.ts',id=>{
+ if(id==='@/lib/auth/account-access')return access;
+ if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>profile};
+ if(id==='@/lib/api-response')return {ok:data=>Response.json({success:true,data}),fail:(code,message,status=400)=>Response.json({success:false,error:{code,message}},{status})};
+ if(id==='@/lib/query-pagination')return {readAllPages:async fn=>{const r=await fn(0,499);if(r.error)throw Error();return r.data;}};
+ if(id==='@/lib/supabase/server')return {createSupabaseServerClient:async()=>({from:()=>{const q={select:()=>q,eq:()=>q,in:()=>q,maybeSingle:async()=>({data:null,error:null})};return q;}})};
+ if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from:table=>{const q={select:()=>q,eq:()=>q,in:()=>q,is:()=>q,order:()=>q,range:async()=>({data:groups,error:null}),maybeSingle:async()=>({data:schedule,error:scheduleError}),then:resolve=>Promise.resolve({data:paceGroups,error:null}).then(resolve)};return q;}})};
+ throw Error(id);
+});
+const call=()=>GET(new Request('http://localhost/api/schedules/run/participation'),{params:Promise.resolve({scheduleId:'run'})});
+let result=await call(),data=(await result.json()).data;
+assert.equal(data.totalParticipants,3);assert.equal(data.participantCount,2);assert.deepEqual(data.groupCounts,{g1:2,g2:1});assert.equal(data.groupMembers.g1.length,2);assert.equal(data.schedule.capacity,3);assert.equal(data.paceGroups.length,2);
+schedule={...schedule,staff_in_capacity:true};data=(await (await call()).json()).data;assert.equal(data.participantCount,3);
+schedule={...schedule,attendance_opened_at:'2026-10-27T00:00:00Z',capacity:5};data=(await (await call()).json()).data;assert.ok(data.schedule.attendance_opened_at);assert.equal(data.schedule.capacity,5);
+scheduleError={code:'failure'};assert.equal((await call()).status,500);scheduleError=null;schedule=null;assert.equal((await call()).status,404);
+profile=null;assert.equal((await call()).status,401);
+const {attendancePresentation}=compile('src/lib/attendance-presentation.ts',()=>{}),base={startAt:'2026-10-27T09:00:00Z',status:'not_checked',opened:false,closed:false,now:Date.parse('2026-10-27T08:00:00Z'),today:true};
+assert.equal(attendancePresentation(base).action,'오늘 일정 확인');assert.equal(attendancePresentation({...base,now:Date.parse('2026-10-27T10:00:00Z')}).label,'출석 시작 대기');assert.equal(attendancePresentation({...base,opened:true,now:Date.parse('2026-10-27T10:00:00Z')}).action,'출석 인증하기');
+for(const status of ['attended','late','absent'])assert.equal(attendancePresentation({...base,status}).action,'출석 기록 보기');
+assert.equal(attendancePresentation({...base,closed:true}).label,'출석 종료');assert.equal(attendancePresentation({...base,today:false}).action,'신청 정보 보기');assert.notEqual(attendancePresentation({...base,status:null,opened:true,now:Date.parse('2026-10-27T10:00:00Z')}).action,'출석 인증하기');
+console.log('Participation state API: synchronized totals/capacity/groups/locks, staff exemption, failure/auth and home attendance states passed');
+
+const require=createRequire(import.meta.url);
+const upcoming={schedule_id:'run',title:'다음 러닝',schedule_type:'regular',status:'open',location:'한강',start_at:'2099-01-01T09:00:00Z',registration_end_at:'2098-12-31',capacity:30,cancellation_deadline_at:null,attendance_opened_at:null,attendance_closed_at:null};
+const joined=[{participation_id:'p1',event_role:null,paceGroup:{pace_group_id:'g1',pace_seconds:390,distance_km:5,group_kind:'running'},schedules:upcoming},{participation_id:'p2',event_role:null,paceGroup:[{pace_group_id:'photo',pace_seconds:0,distance_km:0,group_kind:'photo'}],schedules:[{...upcoming,schedule_id:'photo-run'}]},{participation_id:'p3',event_role:null,paceGroup:null,schedules:{...upcoming,schedule_id:'free-run',schedule_type:'flash'}},{participation_id:'p4',event_role:'cheer',paceGroup:null,schedules:{...upcoming,schedule_id:'event',schedule_type:'event'}}];
+const mine=compile('src/lib/member-journey-server.ts',id=>{
+ if(id==='react')return {cache:fn=>fn};
+ if(id==='./supabase/admin')return {createSupabaseAdminClient:()=>({from:table=>{const q={select:()=>q,eq:()=>q,in:()=>q,order:()=>q,range:async()=>({data:joined,error:null}),then:resolve=>Promise.resolve({data:table==='attendances'?[]:joined,error:null}).then(resolve)};return q;}})};
+ throw Error(id);
+});
+const myRows=await mine.loadMySchedules('me');assert.equal(myRows[0].userId,'me');assert.equal(myRows[0].paceGroup.pace_seconds,390);assert.equal(myRows[1].paceGroup.group_kind,'photo');
+const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+const page=compile('src/app/my-schedules/page.tsx',id=>{
+ if(id==='react/jsx-runtime')return require(id);
+ if(id==='next/link')return {default:({children,...props})=>React.createElement('a',props,children)};
+ if(id==='next/navigation')return {redirect:()=>{throw Error('unexpected redirect')}};
+ if(id==='@/lib/auth/current-user')return {getCurrentPageProfile:async()=>({user_id:'me',role:'member',account_status:'active',approval_status:'approved'})};
+ if(id==='@/lib/auth/account-access')return access;
+ if(id==='@/lib/member-journey-server')return mine;
+ if(id==='@/lib/member-directory')return {attendanceLabels:{not_checked:'미확인'}};
+ if(id==='@/lib/participation-groups')return compile('src/lib/participation-groups.ts',()=>{});
+ throw Error(id);
+});
+const html=renderToStaticMarkup(await page.default());assert.ok(html.includes('내 그룹 · 6:30 / 5km'));assert.ok(html.includes('내 그룹 · 포토'));assert.ok(html.includes('자유 참가 · 그룹 미지정'));assert.ok(html.includes('참석 유형 · 응원단'));assert.ok(!html.includes('/calendar'));assert.ok(!html.includes('캘린더 저장'));
+console.log('My schedules: running/support/free/event group display, joined object/array mapping and calendar removal passed');

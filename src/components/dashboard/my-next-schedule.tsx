@@ -6,5 +6,5 @@ export async function MyNextSchedule({userId,now}:{userId:string;now:string}){
  if(!loaded)return <MyScheduleCard schedule={null} error/>;
  const rows=upcomingMine(loaded,now),today=rows.filter(s=>koreaDay(s.start_at)===koreaDay(now));
  const focus=today.length?today:rows;
- return <MyScheduleCard schedule={focus[0]??null} today={today.length>0} additional={Math.max(0,focus.length-1)}/>;
+ return <MyScheduleCard key={focus[0]?.schedule_id} now={now} schedule={focus[0]??null} today={today.length>0} additional={Math.max(0,focus.length-1)}/>;
 }

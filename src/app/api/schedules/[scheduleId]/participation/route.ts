@@ -45,16 +45,22 @@ export async function GET(_request: Request,{params}:Context){
   const {scheduleId}=await params;
   const supabase=await createSupabaseServerClient();
   try {
-  const [ownResult,groups]=await Promise.all([
+  const [ownResult,groups,scheduleResult,paceResult]=await Promise.all([
     supabase.from("schedule_participations").select("participation_id,schedule_id,user_id,status,registered_at,cancelled_at,cancellation_reason,participation_locked,pace_change_locked,pace_group_id").eq("schedule_id",scheduleId).eq("user_id",profile.user_id).in("status",["registered","completed"]).maybeSingle(),
-    readAllPages((from,to)=>createSupabaseAdminClient().from("schedule_participations").select("pace_group_id,user_id,profiles:profiles!schedule_participations_user_id_fkey(name)").eq("schedule_id",scheduleId).in("status",["registered","completed"]).order("participation_id").range(from,to)),
+    readAllPages((from,to)=>createSupabaseAdminClient().from("schedule_participations").select("pace_group_id,user_id,profiles:profiles!schedule_participations_user_id_fkey!inner(name,role)").eq("schedule_id",scheduleId).in("status",["registered","completed"]).order("participation_id").range(from,to)),
+    createSupabaseAdminClient().from("schedules").select("status,capacity,staff_in_capacity,registration_start_at,registration_end_at,cancellation_deadline_at,attendance_opened_at").eq("schedule_id",scheduleId).is("deleted_at",null).maybeSingle(),
+    createSupabaseAdminClient().from("pace_groups").select("pace_group_id,pace_seconds,distance_km,group_kind").eq("schedule_id",scheduleId).order("pace_seconds"),
   ]);
+  if(scheduleResult.error||paceResult.error)throw new Error();
+  if(!scheduleResult.data)return fail("NOT_FOUND","일정을 찾을 수 없습니다.",404);
   if(ownResult.error)throw new Error();
   const data=ownResult.data;
   const groupCounts:Record<string,number>={};for(const row of groups){const key=row.pace_group_id??'none';groupCounts[key]=(groupCounts[key]??0)+1;}
   const groupMembers:Record<string,{userId:string;name:string}[]>={};
   for(const row of groups){const key=row.pace_group_id??'none';const member=Array.isArray(row.profiles)?row.profiles[0]:row.profiles;(groupMembers[key]??=[]).push({userId:row.user_id,name:member?.name??"회원"});}
-  return ok({participation:data,groupCounts,groupMembers});
+  const schedule=scheduleResult.data;
+  const participantCount=groups.filter(row=>schedule.staff_in_capacity||(Array.isArray(row.profiles)?row.profiles[0]:row.profiles)?.role!=="staff").length;
+  return ok({participation:data,groupCounts,groupMembers,participantCount,totalParticipants:groups.length,schedule,paceGroups:paceResult.data});
   } catch { return fail("DATABASE_ERROR","참가 정보를 불러오지 못했습니다.",500); }
 }
 

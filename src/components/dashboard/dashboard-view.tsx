@@ -5,8 +5,8 @@ import {canAdminister,canStartActivity} from '@/lib/auth/account-access';
 import type {CurrentProfile} from '@/lib/auth/current-user';
 import type {ScheduleSummary} from '@/lib/schedule-overview';
 import {scheduleTypeLabels,scheduleStatusLabels} from '@/lib/schedule-labels';
-import type {MySchedule} from '@/lib/member-journey-server';
-import {attendanceLabels} from '@/lib/member-directory';
+import {MyScheduleCard} from './my-schedule-card';
+export {MyScheduleCard} from './my-schedule-card';
 
 const when=(value:string)=>new Date(value).toLocaleString('ko-KR',{month:'long',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Seoul'});
 export function DashboardView({profile,schedules,now,scheduleError=false,mySection,upcomingSection}:{profile:CurrentProfile;schedules:ScheduleSummary[];now:string;scheduleError?:boolean;mySection?:ReactNode;upcomingSection?:ReactNode}){
@@ -19,12 +19,6 @@ export function DashboardView({profile,schedules,now,scheduleError=false,mySecti
   {upcomingSection??<DashboardUpcoming schedules={schedules} now={now} scheduleError={scheduleError}/>}
   {canOperate&&<details className="home-operations"><summary>크루 운영</summary><nav aria-label="크루 운영"><Link href="/staff/members/pending">가입 승인</Link><Link href="/admin">{canAdminister(profile)?'크루 관리':'회원 조회'}</Link></nav></details>}
  </main>;
-}
-export function MyScheduleCard({schedule,today=false,additional=0,error=false}:{schedule:MySchedule|null;today?:boolean;additional?:number;error?:boolean}){
- const checked=schedule?.attendanceStatus&&schedule.attendanceStatus!=='not_checked';
- return <section className={`home-focus${error?" home-focus-error":""}`} aria-label="내 신청 일정"><div className="home-focus-content"><div className="home-focus-heading"><h2>{error?'내 신청 일정':today?'오늘의 러닝':'내 다음 러닝'}</h2>{schedule&&<span>{checked?attendanceLabels[schedule.attendanceStatus!]: '신청 완료'}</span>}</div>
- {error?<><h3>내 일정을 불러오지 못했어요.</h3><Link className="button-secondary" href="/my-schedules">다시 확인하기</Link></>:schedule?<><h3><Link href={`/schedules/${schedule.schedule_id}`}>{schedule.title}</Link></h3><p className="home-focus-time">{when(schedule.start_at)}</p><p className="home-focus-place">{schedule.location}</p><Link className="button-primary" href={`/schedules/${schedule.schedule_id}${today&&!checked?'#attendance':''}`}>{today&&!checked?'출석 인증하기':'신청 정보 보기'}<Icon name="arrow" size={17}/></Link>{additional>0&&<Link className="home-additional" href="/my-schedules">{today?'오늘 신청한':'신청한'} 다른 일정 {additional}개 →</Link>}</>:<><h3>다음 러닝을 골라볼까요?</h3><p className="home-focus-place">아직 신청한 예정 일정이 없어요.</p><Link className="button-primary" href="/schedules">러닝 일정 보기<Icon name="arrow" size={17}/></Link></>}
- </div><div className="home-focus-footer" aria-hidden="true"><span>WE RUN AS ONE.</span><span>각자의 속도로, 함께.</span></div></section>;
 }
 export function DashboardUpcoming({schedules,now,scheduleError=false}:{schedules:ScheduleSummary[];now:string;scheduleError?:boolean}){
  const rows=schedules.filter(s=>!['cancelled','completed'].includes(s.status)&&Date.parse(s.end_at??s.start_at)>=Date.parse(now)).slice(0,2);

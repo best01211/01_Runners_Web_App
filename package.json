@@ -13,6 +13,7 @@
     "test:tracking-timing-db": "node scripts/test-tracking-timing-database.mjs",
     "test:tracking-staff-api": "node scripts/test-tracking-staff-api.mjs",
     "test:tracking-source-api": "node scripts/test-tracking-source-api.mjs",
+    "test:participation-state": "node scripts/test-participation-state-api.mjs && node scripts/test-participation-state-browser.mjs && node scripts/test-home-browser.mjs",
     "test:staff-tools": "node scripts/test-staff-group-management-api.mjs && node scripts/test-staff-group-management-db.mjs && node scripts/test-staff-tools-browser.mjs",
     "test:tracking": "node scripts/test-tracking.mjs",
     "test:attendance-start-db": "node scripts/test-attendance-start-database.mjs",
