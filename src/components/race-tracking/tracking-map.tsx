@@ -1,15 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { positionAtDistance } from "@/lib/race-tracking/course";
 import type { Coordinate, Course, TrackingState } from "@/lib/race-tracking/types";
 import "leaflet/dist/leaflet.css";
 
-type Props = { course: Course; runners: TrackingState[]; selectedId: string; onSelect: (id: string) => void; revision: number; compact?: boolean; onPickPoint?: (point:Coordinate)=>void; cheerDistance?:number|null; expanded?:boolean };
+type ExtraCourse={id:string;name:string;course:Course};
+const emptyCourses:ExtraCourse[]=[];
+type Props = { additionalCourses?:ExtraCourse[];runnerCourses?:Record<string,Course>;course: Course; runners: TrackingState[]; selectedId: string; onSelect: (id: string) => void; revision: number; compact?: boolean; onPickPoint?: (point:Coordinate)=>void; cheerDistance?:number|null; expanded?:boolean };
 const colors = ["#059669", "#2563eb", "#d97706", "#9333ea", "#db2777", "#64748b"];
+// GridLayer.redraw() in Leaflet 1.9 uses map.getZoom() verbatim. Fractional
+// fitBounds zooms would become invalid OSM URLs (e.g. /12.5/x/y.png).
+// Reattaching runs Leaflet's normal _setView path, which rounds the tile zoom.
+function reloadBackground(map:Leaflet.Map,layer:Leaflet.TileLayer) {
+  if(map.hasLayer(layer))map.removeLayer(layer);
+  layer.addTo(map);
+}
 
-export default function TrackingMap({ course, runners, selectedId, onSelect, revision, compact = false, onPickPoint,cheerDistance,expanded=false }: Props) {
+
+export default function TrackingMap({ course, runners, selectedId, onSelect, revision, compact = false, onPickPoint,cheerDistance,expanded=false,additionalCourses=emptyCourses,runnerCourses }: Props) {
+  const geometry=useMemo(()=>({course,additionalCourses}),[course,additionalCourses]);
   const pick=useRef(onPickPoint);
   useEffect(()=>{pick.current=onPickPoint;},[onPickPoint]);
   const container = useRef<HTMLDivElement>(null);
@@ -21,11 +32,14 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
   useEffect(() => { background.current = showBackground; }, [showBackground]);
   const markers = useRef(new Map<string, Leaflet.CircleMarker>());
   const currentDistances = useRef(new Map<string, number>());
-  const [readyCourse, setReadyCourse] = useState<Course|null>(null);
-  const ready=readyCourse===course;
+  const [readyCourse, setReadyCourse] = useState<typeof geometry|null>(null);
+  const ready=readyCourse===geometry;
   const viewChanging=useRef(false);
   const [viewRevision,setViewRevision]=useState(0);
   const [tileError, setTileError] = useState(false);
+  const [tilesLoading,setTilesLoading]=useState(true);
+  const tileFailures=useRef(new Set<string>());
+  const tileLoadingTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const [mapError, setMapError] = useState(false);
   const selection = useRef(onSelect);
   const previousRevision = useRef(revision);
@@ -33,6 +47,10 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
 
   useEffect(() => {
     let disposed = false;
+    let layoutFrame=0;
+    let retryTimer:ReturnType<typeof setTimeout>|undefined;
+    let automaticRetries=0;
+    tileFailures.current.clear();
     let resizeObserver: ResizeObserver | undefined;
     let removePointerListener:(()=>void)|undefined;
     void import("leaflet").then(L => {
@@ -40,7 +58,7 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
       leafletRef.current = L;
       const element=container.current;
       const map = L.map(element, {
-        scrollWheelZoom:false,zoomSnap:0.25,maxZoom:19,touchZoom:true,bounceAtZoomLimits:false,
+        fadeAnimation:false,zoomAnimation:false,scrollWheelZoom:false,zoomSnap:0.25,maxZoom:19,touchZoom:true,bounceAtZoomLimits:false,
         dragging:!window.matchMedia("(pointer: coarse)").matches,
         renderer:L.svg({padding:0.5}),
       });
@@ -64,22 +82,35 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
         updateWhenIdle:false,updateWhenZooming:true,keepBuffer:3,updateInterval:100,
         referrerPolicy: "strict-origin-when-cross-origin",
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).on("tileerror", () => { if (!disposed) setTileError(true); })
-        .on("tileload", () => { if (!disposed) setTileError(false); });
+      }).on("loading",()=>{if(disposed)return;setTilesLoading(true);clearTimeout(tileLoadingTimer.current);tileLoadingTimer.current=setTimeout(()=>{if(!disposed&&background.current)setTileError(true);},10000);})
+        .on("load",()=>{clearTimeout(tileLoadingTimer.current);if(!disposed){setTilesLoading(false);setTileError(tileFailures.current.size>0);}})
+        .on("tileerror",(event:Leaflet.TileErrorEvent)=>{if(disposed)return;tileFailures.current.add(`${event.coords.z}/${event.coords.x}/${event.coords.y}`);setTileError(true);
+          if(automaticRetries<2&&!retryTimer){retryTimer=setTimeout(()=>{retryTimer=undefined;if(disposed||!background.current)return;automaticRetries++;tileFailures.current.clear();if(tileLayerRef.current)reloadBackground(map,tileLayerRef.current);},1500);}
+        })
+        .on("tileload",(event:Leaflet.TileEvent)=>{if(disposed)return;tileFailures.current.delete(`${event.coords.z}/${event.coords.x}/${event.coords.y}`);setTileError(tileFailures.current.size>0);})
+        .on("tileunload",(event:Leaflet.TileEvent)=>{tileFailures.current.delete(`${event.coords.z}/${event.coords.x}/${event.coords.y}`);});
       // Attach to each new map immediately, including React's effect remounts.
       if (background.current) tileLayerRef.current.addTo(map);
       L.polyline(course.points.map(p => [p.latitude, p.longitude] as [number, number]), { color: "#ffffff", weight: 10, opacity: 1,noClip:true,className:"tracking-course-outline" }).addTo(map);
       const line = L.polyline(course.points.map(p => [p.latitude, p.longitude] as [number, number]), {
         color: "#17465c", weight: 5, opacity: 1,noClip:true,className:"tracking-course-line",
       }).addTo(map);
-      map.fitBounds(line.getBounds(), { padding: [35, 35] });
+      const bounds=line.getBounds();
+      for(const [index,extra] of additionalCourses.entries()){
+        const points=extra.course.points.map(p=>[p.latitude,p.longitude] as [number,number]);
+        L.polyline(points,{color:"#fff",weight:9,opacity:1,noClip:true}).addTo(map);
+        const extraLine=L.polyline(points,{color:["#c2410c","#7e22ce","#047857","#1d4ed8"][index%4],weight:4,opacity:1,noClip:true,className:"tracking-additional-course-line"}).addTo(map).bindTooltip(extra.name,{sticky:true});bounds.extend(extraLine.getBounds());
+        const finish=points[points.length-1];L.circleMarker(finish,{radius:6,color:["#c2410c","#7e22ce","#047857","#1d4ed8"][index%4],fillColor:"#fff",fillOpacity:1,weight:3}).addTo(map).bindTooltip(`${extra.name} FINISH`);
+      }
+      map.fitBounds(bounds, { padding: [35, 35] });
       let width = element.clientWidth,height=element.clientHeight;
       resizeObserver = new ResizeObserver(entries => {
         const nextWidth = entries[0]?.contentRect.width ?? width;
         const nextHeight=entries[0]?.contentRect.height??height;
         if (Math.abs(nextWidth - width) > 1||Math.abs(nextHeight-height)>1) {
           width = nextWidth;height=nextHeight;
-          map.invalidateSize({ pan: true, animate: false });
+          cancelAnimationFrame(layoutFrame);
+          layoutFrame=requestAnimationFrame(()=>{if(disposed)return;map.invalidateSize({pan:true,animate:false});if(background.current){const layer=tileLayerRef.current;if(layer)reloadBackground(map,layer);}});
         }
       });
       resizeObserver.observe(container.current);
@@ -91,24 +122,25 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
       const start = course.points[0], finish = course.points[course.points.length - 1];
       L.circleMarker([start.latitude, start.longitude], { radius: 6, color: "#18181b" }).addTo(map).bindTooltip("START");
       L.circleMarker([finish.latitude, finish.longitude], { radius: 6, color: "#18181b" }).addTo(map).bindTooltip("FINISH");
-      setTileError(false);setMapError(false);setReadyCourse(course);
+      setTileError(false);setMapError(false);setReadyCourse(geometry);
     }).catch(() => { if (!disposed) setMapError(true); });
     const storedMarkers = markers.current;
     const distances = currentDistances.current;
     return () => {
       disposed = true;
       resizeObserver?.disconnect();
+      cancelAnimationFrame(layoutFrame);clearTimeout(retryTimer);clearTimeout(tileLoadingTimer.current);
       removePointerListener?.();
       mapRef.current?.remove(); mapRef.current = null; tileLayerRef.current = null;
       storedMarkers.clear(); distances.clear();
     };
-  }, [course]);
+  }, [course,additionalCourses,geometry]);
 
   useEffect(() => {
     const map = mapRef.current, layer = tileLayerRef.current;
     if (!ready || !map || !layer) return;
-    if (showBackground) layer.addTo(map); else layer.remove();
-  }, [ready, showBackground, course]);
+    if (showBackground) {if(!map.hasLayer(layer))layer.addTo(map);} else {layer.remove();clearTimeout(tileLoadingTimer.current);}
+  }, [ready, showBackground, geometry]);
 
   useEffect(() => {
     if (!ready) return;
@@ -119,12 +151,11 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
       if (!map || !layer) return;
       map.invalidateSize({ pan: true, animate: false });
       if (background.current) {
-        if (!map.hasLayer(layer)) layer.addTo(map);
-        layer.redraw();
+        reloadBackground(map,layer);
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [expanded, ready, course]);
+  }, [expanded, ready, geometry]);
 
   useEffect(() => {
     const map = mapRef.current, L = leafletRef.current;
@@ -169,7 +200,7 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
       for (const state of runners) {
         const from = starts.get(state.runner.id)!;
         const distance = from + (state.distanceMeters - from) * eased;
-        const position = positionAtDistance(course, distance);
+        const position = positionAtDistance(runnerCourses?.[state.runner.id]??course, distance);
         markers.current.get(state.runner.id)?.setLatLng([position.latitude, position.longitude]);
         currentDistances.current.set(state.runner.id, distance);
       }
@@ -177,7 +208,7 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
     };
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
-  }, [course, ready, runners, selectedId, revision,viewRevision]);
+  }, [course, ready, runners, selectedId, revision,viewRevision,runnerCourses]);
 
   useEffect(()=>{
     const map=mapRef.current,L=leafletRef.current;
@@ -192,10 +223,11 @@ export default function TrackingMap({ course, runners, selectedId, onSelect, rev
       {/* Leaflet owns this element's classes. React only resizes its parent. */}
       <div ref={container} style={{ height:"100%",width:"100%",backgroundColor:"#f4f4f5",touchAction:"pan-y" }} aria-label="대회 코스와 선수 예상 위치 지도" />
     </div>
-    <button type="button" onClick={() => mapRef.current?.fitBounds(course.points.map(p => [p.latitude, p.longitude] as [number, number]), { padding: [35, 35] })} className="absolute right-3 top-3 z-[1000] min-h-11 rounded-full border border-zinc-200 bg-white/95 px-4 py-2 text-sm font-bold text-slate-800 shadow-sm">코스 전체</button>
+    <button type="button" onClick={() => mapRef.current?.fitBounds([course,...additionalCourses.map(c=>c.course)].flatMap(c=>c.points.map(p => [p.latitude, p.longitude] as [number, number])), { padding: [35, 35] })} className="absolute right-3 top-3 z-[1000] min-h-11 rounded-full border border-zinc-200 bg-white/95 px-4 py-2 text-sm font-bold text-slate-800 shadow-sm">코스 전체</button>
     <button type="button" aria-pressed={showBackground} onClick={() => setShowBackground(value => !value)} className="absolute right-3 top-16 z-[1000] min-h-11 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 shadow-sm">{showBackground ? "배경 지도 숨기기" : "배경 지도 표시"}</button>
     <p className="pointer-events-none absolute bottom-2 left-3 z-[1000] rounded-lg bg-white/90 px-2 py-1 text-xs text-zinc-600">한 손가락: 화면 스크롤 · 두 손가락: 지도 이동·확대</p>
     {!ready && <p className="absolute inset-x-0 top-4 z-[1000] mx-4 rounded-xl bg-white p-3 text-sm text-zinc-700">{mapError ? "지도를 불러오지 못했습니다. 아래 선수 목록을 이용해주세요." : "지도를 불러오는 중입니다…"}</p>}
-    {showBackground && tileError && <p role="status" className="absolute inset-x-0 bottom-8 z-[1000] mx-4 rounded-xl bg-white p-3 text-sm text-zinc-700">배경 지도 연결이 지연됩니다. 코스와 선수 목록은 계속 확인할 수 있습니다.</p>}
+    {showBackground&&tilesLoading&&!tileError&&<p role="status" className="absolute bottom-8 left-3 z-[1000] rounded-lg bg-white/95 px-3 py-2 text-xs">배경 지도 불러오는 중…</p>}
+    {showBackground && tileError && <p role="status" className="absolute inset-x-0 bottom-8 z-[1000] mx-4 rounded-xl bg-white p-3 text-sm text-zinc-700">배경 지도를 불러오지 못한 구역이 있습니다. 코스와 선수는 계속 확인할 수 있습니다. <button type="button" className="ml-2 min-h-11 font-bold underline" onClick={()=>{tileFailures.current.clear();setTileError(false);setTilesLoading(true);if(mapRef.current&&tileLayerRef.current)reloadBackground(mapRef.current,tileLayerRef.current);}}>배경 지도 다시 불러오기</button></p>}
   </div>;
 }

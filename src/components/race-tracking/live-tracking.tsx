@@ -17,8 +17,8 @@ const inputClass = "mt-1 w-full rounded-xl border border-zinc-300 bg-white p-3 t
 const buttonClass = "min-h-12 w-full sm:w-auto rounded-xl bg-[#22261f] px-4 py-3 font-bold text-white disabled:opacity-40";
 
 export type TrackingPageView = "overview" | "runner" | "cheer" | "entries" | "admin";
-type TrackingSimulation={snapshot:RaceSnapshot;now:number;onCourseSelect:(id:string)=>void;controls?:ReactNode};
-export function LiveTracking({ scheduleId, title, apiPath, initialData, initialView = "overview", simulation }: { scheduleId: string; title: string; initialData?:RaceSnapshot; apiPath?: string; initialView?:TrackingPageView;simulation?:TrackingSimulation }) {
+type TrackingSimulation={snapshot:RaceSnapshot;now:number;onCourseSelect:(id:string)=>void;controls?:ReactNode;allSnapshots?:RaceSnapshot[]};
+export function LiveTracking({ scheduleId, title, apiPath, initialData, initialView = "overview", simulation,initialSelectedId="" }: { scheduleId: string; title: string; initialData?:RaceSnapshot; apiPath?: string; initialView?:TrackingPageView;simulation?:TrackingSimulation;initialSelectedId?:string }) {
  const simulated=Boolean(simulation);
  const [pane,setPane] = useState(initialView);
  const management = pane === "entries" || pane === "admin";
@@ -29,7 +29,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  const [error, setError] = useState("");
  const [receivedNow, setNow] = useState(initialData?Date.parse(initialData.serverNow):0);
  const now=simulation?.now??receivedNow;
- const [selection, setSelection] = useState("");
+ const [selection, setSelection] = useState(initialSelectedId);
  const [refreshing, setRefreshing] = useState(false);
  const anchor = useRef<{ now: number; at: number; healthy: boolean } | null>(null);
  const activeRequest = useRef<AbortController | null>(null);
@@ -118,7 +118,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
    {data.canManage&&<Link href={basePath+"/admin"} aria-current={pane==="admin"?"page":undefined} className="tracking-view-choice">관리자</Link>}
   </nav>}
   {management&&!!data?.courses?.length&&<nav aria-label="대회 종목" className="tracking-course-nav">{data.courses.map(c=><Link key={c.raceId} href={`/tracking/${c.raceId}/${pane}`} aria-current={c.raceId===data.raceId?"page":undefined} className="tracking-course-choice">{c.name} · {c.distanceMeters/1000}km</Link>)}</nav>}
-  {course && data && !management && <LiveTrackingView key={data.raceId??scheduleId} data={data} course={course} states={states} selectedId={selection} onSelect={setSelection} now={now} onCourseSelect={simulation?id=>{setPane("overview");setSelection("");simulation.onCourseSelect(id);}:undefined} activePane={pane as "overview"|"runner"|"cheer"} onPaneChange={setPane} showNavigation={false}/> }
+  {course && data && !management && <LiveTrackingView key={data.raceId??scheduleId} data={data} course={course} states={states} selectedId={selection} onSelect={setSelection} now={now} onCourseSelect={simulation?id=>{setPane("overview");setSelection("");simulation.onCourseSelect(id);}:undefined} activePane={pane as "overview"|"runner"|"cheer"} onPaneChange={setPane} showNavigation={false} simulationSnapshots={simulation?.allSnapshots} onRunnerCourseSelect={simulation?(id,runnerId)=>{setPane(runnerId?"runner":"overview");setSelection(runnerId??"");simulation.onCourseSelect(id);}:undefined}/> }
   {pane==="entries"&&data&&(data.canManage||data.canRegisterEntries)&&<section aria-label="선수 등록 페이지" className="space-y-5">
    <RaceForms data={data} write={write} mode="entries"/>
    <RunnerStatusList states={states}/>
