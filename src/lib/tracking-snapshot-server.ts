@@ -35,6 +35,8 @@ export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile)
  if(siblings.error||groupResult.error||sourceResult.error||syncResult.error)throw new Error("DATABASE_ERROR");
  if(!siblings.data?.some(c=>c.race_id===eventId))throw new Error("NOT_FOUND");
  const groups=groupResult.data??[];
+ const allGroupResult=canManage?await admin.from("tracking_pace_groups").select("group_id,race_id,name,pace_seconds").in("race_id",(siblings.data??[]).map(c=>c.race_id)).order("pace_seconds"):null;
+ if(allGroupResult?.error)throw new Error("DATABASE_ERROR");
  const {data:profiles,error:profileError}=profileResult;
  if(profileError)throw new Error("DATABASE_ERROR");
  const eligible=new Map((profiles??[]).map(p=>[p.user_id,p]));
@@ -51,6 +53,7 @@ export async function loadTrackingSnapshot(raceId:string,profile:CurrentProfile)
  }
  const snapshot: RaceSnapshot = {
   canRegisterEntries,
+  ...(allGroupResult?{allGroups:(allGroupResult.data??[]).map(g=>{const c=siblings.data?.find(c=>c.race_id===g.race_id);return {groupId:g.group_id,name:g.name,paceSeconds:g.pace_seconds,courseId:g.race_id,courseName:c?.course_name??"",distanceMeters:c?.distance_meters??0};})}:{}),
   ...(sourceResult.data?{timing:{collectionMode:"public-page",sourceUrl:sourceResult.data.source_url,courseCode:course.timing_course_code,enabled:sourceResult.data.enabled,credentialsReady:!!timingCredentials(myResultSource(sourceResult.data.source_url).id),lastSyncedAt:syncResult.data?.last_synced_at??null,lastAttemptAt:syncResult.data?.last_attempt_at??null,nextRefreshAt:syncResult.data?.next_at??null,status:!sourceResult.data.enabled?"disabled":syncResult.data?.status??"ready",message:syncResult.data?.message??""}}:{}),
   raceId,eventId,courses:(siblings.data??[]).map(c=>({raceId:c.race_id,name:c.course_name,distanceMeters:c.distance_meters,startAt:c.start_at,timingCourseCode:c.timing_course_code})),
   groups:groups.map(g=>({groupId:g.group_id,name:g.name,paceSeconds:g.pace_seconds})),

@@ -54,6 +54,7 @@ export async function GET(_:Request,{params}:Context){
 }
 
 const errors: Record<string, string> = {
+ GROUP_NOT_FOUND:"선택한 종목의 그룹을 찾을 수 없습니다.",INVALID_GROUP:"그룹 이름과 페이스를 확인해주세요.",
  DUPLICATE_COURSE:"이미 등록된 종목 이름입니다.", INVALID_COURSE:"종목 이름과 코스 정보를 확인해주세요.",
  GROUP_REQUIRED:"선택한 그룹이 해당 코스의 그룹인지 확인해주세요. 그룹 미지정으로도 등록할 수 있습니다.", EVENT_ENTRY_EXISTS:"이미 이 대회의 다른 종목에 등록된 회원입니다.", GROUP_LIMIT:"종목별 그룹은 50개까지 등록할 수 있습니다.",
  RACE_FORBIDDEN: "변경 권한이 없습니다.", RACE_NOT_FOUND: "진행 가능한 이벤트가 아닙니다.",
@@ -90,6 +91,7 @@ export async function POST(request: Request, { params }: Context) {
  if (error) {
   if (["42P01","PGRST202","PGRST205"].includes(error.code)) return databaseFailure(error.code);
   if (error.code === "23505") return fail("DUPLICATE", "이미 등록된 배번호·그룹명 또는 계측 지점입니다.", 409);
+  if(write.action==="group-edit"&&error.message.includes("INVALID_ACTION"))return fail("SETUP_REQUIRED","그룹 수정 DB 설정이 필요합니다. 041 마이그레이션을 적용해주세요.",503);
   const message = errors[error.message];
   return fail("WRITE_FAILED", message ?? "저장하지 못했습니다. 입력값과 DB 설정을 확인해주세요.", message ? 409 : 400);
  }

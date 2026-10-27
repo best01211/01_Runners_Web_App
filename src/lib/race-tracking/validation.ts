@@ -4,6 +4,7 @@ import type { Coordinate } from "./types";
 export type RaceWrite =
  | { action: "course"; name: string; distanceMeters: number; points: Coordinate[]; startAt: string; courseName?: string; parentRaceId?: string }
  | { action: "group"; name: string; paceSeconds: number; courseId?: string }
+ | { action: "group-edit"; groupId:string;courseId:string;name:string;paceSeconds:number }
  | { action: "entry"; userId?: string; runnerName?: string; entryId?: string; bib: string; targetPaceSeconds: number | null; groupId?: string | null }
  | { action: "entry-delete"; entryId: string }
  | { action: "entry-move"; entryId: string; courseId: string; groupId: string | null }
@@ -35,6 +36,12 @@ export function validateRaceWrite(value: unknown): RaceWrite {
   buildCourse(points, distanceMeters);
   if(b.parentRaceId!==undefined&&!isUUID(b.parentRaceId))throw new Error("대회를 선택해주세요.");
   return { action: "course", name: text(b.name, 100), points, distanceMeters, startAt: time(b.startAt), ...(b.courseName!==undefined?{courseName:text(b.courseName,60)}:{}), ...(b.parentRaceId?{parentRaceId:b.parentRaceId as string}:{}) };
+ }
+ if(b.action==="group-edit") {
+  if(!isUUID(b.groupId)||!isUUID(b.courseId))throw new Error("수정할 종목과 그룹을 선택해주세요.");
+  const paceSeconds=number(b.paceSeconds,120,1200);if(!Number.isInteger(paceSeconds))throw new Error("페이스는 정수 초로 입력해주세요.");
+  const name=text(b.name,40);if(/[\r\n\x00-\x1f]/.test(name))throw new Error("그룹 이름을 한 줄로 입력해주세요.");
+  return {action:"group-edit",groupId:b.groupId,courseId:b.courseId,name,paceSeconds};
  }
  if(b.action==="group") { const paceSeconds=number(b.paceSeconds,120,1200);if(!Number.isInteger(paceSeconds))throw new Error("페이스는 정수 초로 입력해주세요.");if(b.courseId!==undefined&&!isUUID(b.courseId))throw new Error("코스를 선택해주세요.");return {action:"group",name:text(b.name,40),paceSeconds,...(b.courseId?{courseId:b.courseId as string}:{})}; }
  if (b.action === "entry") {

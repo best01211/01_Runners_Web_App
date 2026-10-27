@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test:tracking-map-browser": "node scripts/test-tracking-map-browser.mjs",
     "test:tracking-ui-browser": "node scripts/test-tracking-ui-browser.mjs",
+    "test:tracking-groups": "node scripts/test-tracking-group-edit-api.mjs && node scripts/test-tracking-group-edit-db.mjs && node scripts/test-tracking-ui-browser.mjs",
     "test:tracking-courses-db": "node scripts/test-tracking-courses-database.mjs",
     "test:tracking-timing-db": "node scripts/test-tracking-timing-database.mjs",
     "test:tracking-staff-api": "node scripts/test-tracking-staff-api.mjs",

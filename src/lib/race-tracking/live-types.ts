@@ -8,6 +8,7 @@ export type RaceSnapshot = {
  raceId?: string;
  eventId?: string;
  courses?: { raceId: string; name: string; distanceMeters: number; startAt: string; timingCourseCode?:string }[];
+ allGroups?:{groupId:string;name:string;paceSeconds:number;courseId:string;courseName:string;distanceMeters:number}[];
  groups?: { groupId: string; name: string; paceSeconds: number }[];
  canRegisterEntries?: boolean;
  timing?: {collectionMode?:"public-page";credentialsReady:boolean;sourceUrl:string;courseCode:string;enabled:boolean;lastSyncedAt:string|null;lastAttemptAt?:string|null;nextRefreshAt?:string|null;status:string;message:string};
