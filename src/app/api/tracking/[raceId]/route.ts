@@ -18,6 +18,12 @@ export async function DELETE(request: Request, { params }: Context) {
  const { raceId } = await params;
  if (!isUUID(raceId)) return fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404);
  const admin = createSupabaseAdminClient();
+ if (profile.role !== "admin") {
+  const {data: race, error: raceError} = await admin.from("tracking_races").select("parent_race_id").eq("race_id", raceId).maybeSingle();
+  if (raceError) return fail("DATABASE_ERROR", "대회 정보를 불러오지 못했습니다.", 503);
+  if (!race) return fail("NOT_FOUND", "이벤트를 찾을 수 없습니다.", 404);
+  if (!race.parent_race_id) return fail("FORBIDDEN", "관리자만 대회 전체를 보관할 수 있습니다.", 403);
+ }
  // Keep related entries/checkpoints intact, and use the existing visibility policy.
  const { data, error } = await admin.from("tracking_races").update({status:"archived"}).or(`race_id.eq.${raceId},parent_race_id.eq.${raceId}`).select("race_id");
  if (error) return fail("DELETE_FAILED", "이벤트를 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.", 503);

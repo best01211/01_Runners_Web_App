@@ -715,3 +715,10 @@ input[type=checkbox] { width: 20px; height: 20px; }
  .club-header-actions .logout-button{width:36px}
 }
 @media(max-width:359px){.club-brand .brand{width:64px}}
+
+.pace-choice-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; width: 100%; }
+.pace-choice-heading strong { min-width: 0; overflow-wrap: anywhere; }
+.pace-choice-count { flex-shrink: 0; border-radius: 999px; padding: 2px 8px; background: #f1f5f9; color: #475569; }
+.pace-choice-members { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.pace-choice-member { border-radius: 6px; padding: 3px 7px; background: #f8fafc; font-size: 12px; overflow-wrap: anywhere; }
+.pace-choice[aria-pressed=true] .pace-choice-count, .pace-choice[aria-pressed=true] .pace-choice-member { background: #dcfce7; color: #14532d; }

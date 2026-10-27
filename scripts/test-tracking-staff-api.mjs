@@ -8,14 +8,15 @@ const local=file=>compile(file,id=>local(path.resolve(path.dirname(file),id+'.ts
 const access=local('src/lib/auth/account-access.ts'),validation=local('src/lib/race-tracking/validation.ts'),provider=local('src/lib/race-tracking/myresult.ts');
 let profile=null,writes=[];const race='11111111-1111-4111-8111-111111111111',user='22222222-2222-4222-8222-222222222222',group='33333333-3333-4333-8333-333333333333';
 const response={fail:(code,message,status=400)=>Response.json({success:false,error:{code,message}},{status}),ok:data=>Response.json({success:true,data})};
+let archiveParent=null,archiveWrites=0;
 let memberName='홍길동',memberLookupError=null;
-const {POST}=compile('src/app/api/tracking/[raceId]/route.ts',id=>{
+const {POST,DELETE}=compile('src/app/api/tracking/[raceId]/route.ts',id=>{
  if(id==='@/lib/tracking-snapshot-server')return {};
  if(id==='@/lib/auth/account-access')return access;
  if(id==='@/lib/auth/current-user')return {getCurrentProfile:async()=>profile};
  if(id==='@/lib/api-response')return response;
  if(id==='@/lib/race-tracking/validation')return validation;
- if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from:table=>{const q={select:()=>q,eq:()=>q,is:()=>q,maybeSingle:async()=>table==='profiles'?{data:memberName===null?null:{name:memberName},error:memberLookupError}:{data:{name:'대회',status:'active'},error:null}};return q;}})};
+ if(id==='@/lib/supabase/admin')return {createSupabaseAdminClient:()=>({from:table=>{const q={update:()=>{archiveWrites++;return q;},or:()=>q,then:resolve=>Promise.resolve({data:[{race_id:race}],error:null}).then(resolve),select:()=>q,eq:()=>q,is:()=>q,maybeSingle:async()=>table==='profiles'?{data:memberName===null?null:{name:memberName},error:memberLookupError}:{data:{name:'대회',status:'active',parent_race_id:archiveParent},error:null}};return q;}})};
  if(id==='@/lib/supabase/server')return {createSupabaseServerClient:async()=>({rpc:async(fn,args)=>{writes.push({fn,args});return {error:null};}})};
  throw Error(id);
 });
@@ -111,3 +112,11 @@ check(applies.at(-1).entry_results.find(r=>r.entryId===group).code,'COURSE_MISMA
 check(applies.at(-1).entry_results.find(r=>r.entryId===group).providerCourseCode,'Full');
 }finally{Date.now=realNow;}
 console.log(`Tracking staff API and sync orchestration: ${count} checks passed`);
+
+const archive=()=>DELETE(new Request(`http://localhost/api/tracking/${race}`,{method:'DELETE',headers:{origin:'http://localhost'}}),{params:Promise.resolve({raceId:race})});
+profile={role:'staff',staff_position:'president',account_status:'active',approval_status:'approved'};
+check((await archive()).status,403);check(archiveWrites,0);
+archiveParent=user;check((await archive()).status,200);check(archiveWrites,1);
+archiveParent=null;profile={...profile,role:'admin'};
+check((await archive()).status,200);check(archiveWrites,2);
+console.log('Tracking archive: president denied event archive, course permission preserved, admin allowed');
