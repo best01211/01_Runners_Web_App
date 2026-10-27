@@ -12,13 +12,15 @@ const states:Record<string,string>={active:'정상',restricted:'신청 제한',s
 
 
 export function MemberDirectory({members,canEdit,isAdmin,selfId}:{members:DirectoryMember[];canEdit:boolean;isAdmin:boolean;selfId:string}){
+ const [search,setSearch]=useState('');
  const [tab,setTab]=useState('all'),[selected,setSelected]=useState<string[]>([]),[opened,setOpened]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const tabs=[['all','전체'],...(isAdmin?[['admin','관리자']]:[]),['staff','운영진'],['member','회원'],['guest','게스트']];
  const authorized=members.filter(m=>isAdmin||m.role!=='admin');
  const allMembers=authorized.filter(m=>m.role!=='admin');
  const roleOrder:Record<string,number>={admin:0,staff:1,member:2,guest:3,pending:4};
  const inTab=(key:string)=>key==='all'?allMembers:authorized.filter(m=>m.role===key);
- const visible=[...inTab(tab)].sort((a,b)=>(roleOrder[a.role]??5)-(roleOrder[b.role]??5));
+ const keyword=search.trim().toLocaleLowerCase();
+ const visible=[...inTab(tab)].filter(m=>[m.name,m.nickname??''].some(value=>value.toLocaleLowerCase().includes(keyword))).sort((a,b)=>(roleOrder[a.role]??5)-(roleOrder[b.role]??5));
  const selectedIds=selected.filter(id=>allMembers.some(m=>m.user_id===id));
  async function download(){
   if(!selectedIds.length||busy)return;setBusy(true);setError('');
@@ -27,11 +29,11 @@ export function MemberDirectory({members,canEdit,isAdmin,selfId}:{members:Direct
    const url=URL.createObjectURL(await res.blob()),a=document.createElement('a');a.href=url;a.download=res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]??'runners-attendance.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(e){setError(e instanceof Error?e.message:'다운로드에 실패했습니다.');}finally{setBusy(false);}
  }
- return <div className="member-directory"><nav className="management-tabs" aria-label="회원 등급">{tabs.map(([key,label])=><button type="button" key={key} aria-pressed={tab===key} onClick={()=>{setTab(key);setOpened(null);setError('');}}>{label} <span>{inTab(key).length}</span></button>)}</nav>
- {tab==='all'&&<div className="member-export-toolbar"><label><input type="checkbox" aria-label="회원 전체 선택" checked={allMembers.length>0&&selectedIds.length===allMembers.length} onChange={e=>setSelected(e.target.checked?allMembers.map(m=>m.user_id):[])}/> 전체 선택</label><span>{selectedIds.length}명 선택 · 전체 기간</span><button type="button" className="button-primary" disabled={!selectedIds.length||busy} onClick={download}>{busy?'파일 생성 중…':'출석 CSV 다운로드'}</button></div>}
+ return <div className="member-directory"><div className="mb-4 space-y-2"><label className="block text-sm font-semibold">회원 이름·닉네임 검색<input type="search" className="input mt-2" value={search} onChange={e=>{setSearch(e.target.value);setOpened(null);}} placeholder="이름 또는 닉네임을 입력해주세요"/></label><p role="status" className="text-sm text-zinc-500">{keyword?`검색 결과 ${visible.length}명`:`${inTab(tab).length}명`}{selectedIds.length>0&&" · 검색해도 기존 선택은 유지됩니다."}</p></div><nav className="management-tabs" aria-label="회원 등급">{tabs.map(([key,label])=><button type="button" key={key} aria-pressed={tab===key} onClick={()=>{setTab(key);setOpened(null);setError('');}}>{label} <span>{inTab(key).length}</span></button>)}</nav>
+ {tab==='all'&&<div className="member-export-toolbar"><label><input type="checkbox" aria-label="검색 결과와 관계없이 회원 전체 선택" checked={allMembers.length>0&&selectedIds.length===allMembers.length} onChange={e=>setSelected(e.target.checked?allMembers.map(m=>m.user_id):[])}/> 전체 회원 선택</label><span>{selectedIds.length}명 선택 · 전체 기간</span><button type="button" className="button-primary" disabled={!selectedIds.length||busy} onClick={download}>{busy?'파일 생성 중…':'출석 CSV 다운로드'}</button></div>}
  {error&&<p role="alert" className="text-red-600">{error}</p>}
  <div className="member-list-head" aria-hidden="true"><span>이름 / 닉네임</span><span>삭제 여부</span><span>역할</span></div>
- {!visible.length&&<p className="py-8 text-center text-zinc-500">해당 회원이 없습니다.</p>}
+ {!visible.length&&<p className="py-8 text-center text-zinc-500">{keyword?"검색된 회원이 없습니다.":"해당 회원이 없습니다."}</p>}
  {visible.map(m=><article className="member-list-item" key={m.user_id}><div className="member-list-row">{tab==='all'&&<input type="checkbox" aria-label={`${m.name} 선택`} checked={selectedIds.includes(m.user_id)} onChange={e=>setSelected(prev=>e.target.checked?[...prev,m.user_id]:prev.filter(id=>id!==m.user_id))}/>}
  <button type="button" className="member-row-button" aria-expanded={opened===m.user_id} aria-controls={`member-${m.user_id}`} onClick={()=>setOpened(opened===m.user_id?null:m.user_id)}><span><strong>{m.name}</strong><small>{m.nickname||'닉네임 없음'}</small></span><span>계정 존재{m.account_status==='withdrawn'&&<small>탈퇴 계정</small>}</span><span>{memberRole(m.role,m.staff_position)}<small>{opened===m.user_id?'접기 −':'열기 +'}</small></span></button></div>
  {opened===m.user_id&&<MemberPanel key={`${m.user_id}-${m.role}-${m.account_status}-${m.staff_position}`} member={m} canEdit={canEdit} isAdmin={isAdmin} selfId={selfId}/>}

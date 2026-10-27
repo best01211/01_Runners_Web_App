@@ -207,3 +207,21 @@ body,.app-shell { background:var(--crew-paper); color:var(--crew-ink); }
  .home-shortcuts a { flex-direction:row; justify-content:flex-start; gap:12px; min-height:52px; padding:10px 14px; font-size:13px; }
  .schedule-detail-actions { grid-template-columns:minmax(0,1fr); }
 }
+
+.attendance-summary { display:flex; flex-wrap:wrap; gap:8px; }
+.attendance-summary button { min-height:44px; padding:8px 12px; border:1px solid var(--crew-line); border-radius:10px; background:white; font-size:13px; }
+.attendance-summary button[aria-pressed=true] { background:var(--crew-ink); color:white; border-color:var(--crew-ink); }
+.attendance-roster-filters { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:12px; margin-top:16px; }
+.attendance-roster-filters label { min-width:0; font-size:13px; }
+.attendance-close-dialog { position:fixed; inset:0; margin:auto; width:calc(100% - 32px); max-width:480px; max-height:85dvh; overflow:auto; padding:24px; border:1px solid var(--crew-line); border-radius:16px; background:white; color:var(--crew-ink); }
+.attendance-close-dialog::backdrop { background:#0007; }
+.attendance-close-list { max-height:32dvh; overflow:auto; margin-top:16px; padding:12px; border-radius:10px; background:#f4f4ef; font-size:14px; }
+.attendance-close-list li + li { margin-top:8px; }
+.staff-group-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.staff-group-management { min-width:0; }
+.staff-group-management .input { min-width:0; width:100%; }
+@media(max-width:479px) {
+ .attendance-roster-filters { grid-template-columns:minmax(0,1fr); }
+ .staff-group-actions > button { flex:1 1 120px; white-space:normal; }
+ .attendance-close-dialog { padding:20px; }
+}
