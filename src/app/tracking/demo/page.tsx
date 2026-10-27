@@ -11,8 +11,8 @@ export default async function TrackingDemoPage() {
   if (!profile) redirect("/login");
   if (profile.account_status !== "active") redirect("/account-status");
   if (profile.approval_status !== "approved" || profile.role === "pending") redirect("/pending");
-  return <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-8 sm:px-6">
-    <Link href="/dashboard" className="text-sm font-semibold text-emerald-700">← 대시보드</Link>
+  return <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-8">
+    <Link href="/tracking" className="text-sm font-semibold text-emerald-700">← 추적 목록</Link>
     <TrackingTabs active="demo" admin={canAdminister(profile)}/><TrackingDemo />
   </main>;
 }

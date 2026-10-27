@@ -4,7 +4,7 @@ import { RaceRegistrationForm } from "./race-registration-form";
 import Link from "next/link";
 import { LiveTrackingView } from "./live-tracking-view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { buildCourse, courseFromGeoJSON, courseFromGPX } from "@/lib/race-tracking/course";
 import {nextTrackingRefresh,canRefreshTracking} from "@/lib/race-tracking/refresh-policy";
 import { trackRunner } from "@/lib/race-tracking/engine";
@@ -17,14 +17,18 @@ const inputClass = "mt-1 w-full rounded-xl border border-zinc-300 bg-white p-3 t
 const buttonClass = "min-h-12 w-full sm:w-auto rounded-xl bg-[#22261f] px-4 py-3 font-bold text-white disabled:opacity-40";
 
 export type TrackingPageView = "overview" | "runner" | "cheer" | "entries" | "admin";
-export function LiveTracking({ scheduleId, title, apiPath, initialData, initialView = "overview" }: { scheduleId: string; title: string; initialData?:RaceSnapshot; apiPath?: string; initialView?:TrackingPageView }) {
+type TrackingSimulation={snapshot:RaceSnapshot;now:number;onCourseSelect:(id:string)=>void;controls?:ReactNode};
+export function LiveTracking({ scheduleId, title, apiPath, initialData, initialView = "overview", simulation }: { scheduleId: string; title: string; initialData?:RaceSnapshot; apiPath?: string; initialView?:TrackingPageView;simulation?:TrackingSimulation }) {
+ const simulated=Boolean(simulation);
  const [pane,setPane] = useState(initialView);
  const management = pane === "entries" || pane === "admin";
  const basePath = "/tracking/" + scheduleId;
  const endpoint = apiPath ?? `/api/schedules/${scheduleId}/tracking`;
- const [data, setData] = useState<RaceSnapshot | null>(initialData??null);
+ const [receivedData, setData] = useState<RaceSnapshot | null>(initialData??null);
+ const data=simulation?.snapshot??receivedData;
  const [error, setError] = useState("");
- const [now, setNow] = useState(initialData?Date.parse(initialData.serverNow):0);
+ const [receivedNow, setNow] = useState(initialData?Date.parse(initialData.serverNow):0);
+ const now=simulation?.now??receivedNow;
  const [selection, setSelection] = useState("");
  const [refreshing, setRefreshing] = useState(false);
  const anchor = useRef<{ now: number; at: number; healthy: boolean } | null>(null);
@@ -34,7 +38,7 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  const [coolingDown,setCoolingDown]=useState(false);
  const [cooldownSeconds,setCooldownSeconds]=useState(0);
  const load = useCallback(async () => {
-  if (activeRequest.current) return;
+  if (simulated||activeRequest.current) return;
   const controller = new AbortController(); activeRequest.current = controller;
   const timeout = setTimeout(() => controller.abort(), 10000);
   if (mounted.current) setRefreshing(true);
@@ -56,16 +60,18 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
    clearTimeout(timeout); if (activeRequest.current === controller) activeRequest.current = null;
    if (mounted.current) setRefreshing(false);
   }
- }, [endpoint]);
+ }, [endpoint,simulated]);
  useEffect(() => {
   mounted.current = true;
+  if(simulated){const timer=setInterval(()=>{const clock=performance.now();setCoolingDown(!canRefreshTracking(clock,lastRefresh.current));setCooldownSeconds(Math.max(0,Math.ceil((60000-clock+lastRefresh.current)/1000)));},1000);return()=>{mounted.current=false;clearInterval(timer);};}
   if(initialData)anchor.current={now:Date.parse(initialData.serverNow),at:performance.now(),healthy:true};else void load();
   const tick = setInterval(() => { const a = anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();if(a?.healthy)setNow(clock);setCoolingDown(!canRefreshTracking(clock,lastRefresh.current));setCooldownSeconds(Math.max(0,Math.ceil((60000-clock+lastRefresh.current)/1000))); }, 1000);
   return () => { mounted.current = false; activeRequest.current?.abort(); activeRequest.current = null; clearInterval(tick); };
- }, [load,initialData]);
+ }, [load,initialData,simulated]);
  const automatic=!!(data?.timing?.enabled&&(data.timing.collectionMode==="public-page"||data.timing.credentialsReady)&&data.timing.courseCode);
  const startAt=data?.course?.startAt;
  const refresh=useCallback(async(manual:boolean)=>{
+  if(simulated){const clock=performance.now();if(!canRefreshTracking(clock,lastRefresh.current))return;lastRefresh.current=clock;setCoolingDown(true);setCooldownSeconds(60);return;}
   const a=anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();
   if(refreshActive.current||!canRefreshTracking(clock,lastRefresh.current))return;
   lastRefresh.current=clock;refreshActive.current=true;setCoolingDown(true);setCooldownSeconds(60);setRefreshing(true);
@@ -77,9 +83,9 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
    await load();
   }catch(e){if(mounted.current)setError(e instanceof Error?e.message:"계측 갱신이 지연됩니다.");}
   finally{refreshActive.current=false;if(mounted.current)setRefreshing(false);}
- },[automatic,startAt,endpoint,load]);
+ },[automatic,startAt,endpoint,load,simulated]);
  useEffect(()=>{
-  if(!startAt)return;
+  if(simulated||!startAt)return;
   const a=anchor.current,clock=a?a.now+performance.now()-a.at:Date.now();
   let next=nextTrackingRefresh(startAt,clock);
   const timer=setInterval(()=>{
@@ -88,12 +94,13 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
    next=nextTrackingRefresh(startAt,current);void refresh(false);
   },1000);
   return()=>clearInterval(timer);
- },[startAt,refresh]);
+ },[startAt,refresh,simulated]);
  const courseData = data?.course;
  const course = useMemo(() => courseData ? buildCourse(courseData.points, courseData.distanceMeters) : null, [courseData]);
  const states = useMemo(() => course && data ? data.runners.map(runner => trackRunner(runner, data.checkpoints[runner.id] ?? [], course, now)) : [], [course, data, now]);
 
  async function write(payload: RaceWrite) {
+  if(simulated)throw new Error("가상 데모에서는 실제 기록을 저장할 수 없습니다.");
   const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   const result = await response.json();
   if (!response.ok || !result.success) throw new Error(result.error?.message ?? "저장하지 못했습니다.");
@@ -102,15 +109,16 @@ export function LiveTracking({ scheduleId, title, apiPath, initialData, initialV
  return <div className="mt-4 space-y-4 text-zinc-900">
   <header className="border-b border-zinc-200 p-4"><p className="text-sm font-bold text-zinc-600">대회 선수 추적 · 계측 기반 예측</p><h1 className="mt-2 break-words text-2xl font-black sm:text-3xl">{title}</h1>{data?.course&&<p className="mt-2 text-sm text-zinc-500">{data.course.name} · {new Date(data.course.startAt).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})} 출발</p>}{!data?.course && <p className="mt-3 text-sm leading-6">계측 기록으로 계산한 예상 위치입니다. GPS 실측 위치가 아닙니다.</p>}</header>
   <div className="flex items-center justify-between gap-3 px-1"><p className="min-w-0 text-xs leading-5 text-zinc-500">{data ? `마지막 수신: ${new Date(data.serverNow).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })} · 출발 후 3분마다 갱신` : "추적 정보를 불러오는 중입니다."}</p><button className="min-h-11 shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-40" aria-label="새로고침" aria-describedby={coolingDown?"refresh-wait":undefined} disabled={refreshing||coolingDown} onClick={() => void refresh(true)}>{refreshing ? "갱신 중…" : coolingDown?<span id="refresh-wait">{cooldownSeconds}초 후 갱신 가능</span>:"새로고침"}</button></div>
+  {simulation?.controls}
   {error && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">{error}{data && " 마지막 수신 위치를 유지하고 있습니다."}</p>}
   {data && !course && <p className="rounded-2xl border p-5">코스가 아직 등록되지 않았습니다. 운영진이 공식 거리와 코스 파일을 등록하면 추적이 시작됩니다.</p>}
   {data && <nav aria-label="추적 화면" className="tracking-view-nav">
-   {([["overview","대회 현황"],["runner","선수 기록"],["cheer","응원 지점"]] as const).map(([key,label])=>management?<Link key={key} href={basePath+(key==="overview"?"":"?view="+key)} className="tracking-view-choice">{label}</Link>:<button key={key} type="button" onClick={()=>setPane(key)} aria-pressed={pane===key} className="tracking-view-choice">{label}</button>)}
+   {([["overview","대회 현황"],["runner","선수 기록"],["cheer","응원 지점"]] as const).map(([key,label])=>management?<Link key={key} href={basePath+(key==="overview"?"":"?view="+key)} className="tracking-view-choice">{label}</Link>:<button key={key} type="button" onClick={()=>setPane(key)} aria-label={label} aria-pressed={pane===key} className="tracking-view-choice">{label}</button>)}
    {(data.canManage||data.canRegisterEntries)&&<Link href={basePath+"/entries"} aria-current={pane==="entries"?"page":undefined} className="tracking-view-choice">선수 등록</Link>}
    {data.canManage&&<Link href={basePath+"/admin"} aria-current={pane==="admin"?"page":undefined} className="tracking-view-choice">관리자</Link>}
   </nav>}
   {management&&!!data?.courses?.length&&<nav aria-label="대회 종목" className="tracking-course-nav">{data.courses.map(c=><Link key={c.raceId} href={`/tracking/${c.raceId}/${pane}`} aria-current={c.raceId===data.raceId?"page":undefined} className="tracking-course-choice">{c.name} · {c.distanceMeters/1000}km</Link>)}</nav>}
-  {course && data && !management && <LiveTrackingView key={data.raceId??scheduleId} data={data} course={course} states={states} selectedId={selection} onSelect={setSelection} now={now} activePane={pane as "overview"|"runner"|"cheer"} onPaneChange={setPane} showNavigation={false}/> }
+  {course && data && !management && <LiveTrackingView key={data.raceId??scheduleId} data={data} course={course} states={states} selectedId={selection} onSelect={setSelection} now={now} onCourseSelect={simulation?id=>{setPane("overview");setSelection("");simulation.onCourseSelect(id);}:undefined} activePane={pane as "overview"|"runner"|"cheer"} onPaneChange={setPane} showNavigation={false}/> }
   {pane==="entries"&&data&&(data.canManage||data.canRegisterEntries)&&<section aria-label="선수 등록 페이지" className="space-y-5">
    <RaceForms data={data} write={write} mode="entries"/>
    <RunnerStatusList states={states}/>

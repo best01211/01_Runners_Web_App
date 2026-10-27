@@ -21,8 +21,13 @@ try{
  browser=await chromium.launch({headless:true,...(executablePath?{executablePath}:{})});
  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('https://tile.openstreetmap.org/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#eef0ed"/></svg>'}));
+ const demoRequests=[];let demoActive=true;page.on('request',r=>{if(demoActive&&new URL(r.url()).pathname.startsWith('/api/'))demoRequests.push(r.url());});
  await page.goto(`http://127.0.0.1:${server.address().port}`);
  await page.getByRole('heading',{name:'선수 현황 · 하프'}).waitFor();
+ const demoNavigation=await page.locator('.tracking-view-nav .tracking-view-choice').evaluateAll(els=>els.map(e=>({tag:e.tagName,text:e.textContent,className:e.className})));
+ assert.equal(await page.getByRole('link',{name:'관리자',exact:true}).count(),0);assert.equal(await page.getByRole('link',{name:'선수 등록',exact:true}).count(),0);
+ assert.equal(await page.locator('.tracking-demo-controls').getAttribute('open'),null);
+ await page.getByRole('button',{name:'새로고침',exact:true}).click();assert.equal(await page.getByRole('button',{name:'새로고침',exact:true}).isDisabled(),true);
  const activePane=page.getByRole('button',{name:'대회 현황',exact:true});assert.equal(await activePane.getAttribute('aria-pressed'),'true');assert.equal(await activePane.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(34, 38, 31)');assert.equal(await page.getByRole('link',{name:'하프 · 21.0975km',exact:true}).getAttribute('aria-current'),'page');
  await page.getByText('그룹 페이스 기준',{exact:false}).first().waitFor();
  // Expansion and collapse must retain complete background tile coverage.
@@ -52,7 +57,11 @@ try{
  assert.ok(await page.getByText('分後').count()===0);
  assert.ok(await page.getByText(/분 후/).count()>0);
  await page.screenshot({path:path.join(dir,'03-cheer-mobile.png'),fullPage:true});
+ await page.locator('.tracking-demo-controls summary').click();
+ await page.getByRole('button',{name:'재생',exact:true}).click();await page.getByRole('button',{name:'일시정지',exact:true}).waitFor();await page.getByRole('button',{name:'일시정지',exact:true}).click();
+ await page.evaluate(()=>{window.__demoMap=document.querySelector('.leaflet-container');});
  await page.getByRole('slider',{name:'가상 대회 진행 시각'}).fill('2100');
+ assert.equal(await page.evaluate(()=>window.__demoMap===document.querySelector('.leaflet-container')),true,'virtual time changes preserve the current map instance');
  await page.getByRole('button',{name:'선수 기록',exact:true}).click();
  await page.getByText('실제 계측 기반',{exact:false}).first().waitFor();
  await page.getByRole('link',{name:'10K · 10km',exact:true}).click();
@@ -63,12 +72,14 @@ try{
   await page.getByRole('button',{name:'지도 줄이기',exact:true}).click();await assertTiles();
  }
  await page.screenshot({path:path.join(dir,'04-overview-desktop.png'),fullPage:true});
+ assert.deepEqual(demoRequests,[],'demo playback, refresh, tabs and courses must never call real APIs');demoActive=false;
  const requests=[];let seeded,epochBase;
  await page.clock.install();
  await page.route('**/api/tracking/fixture',async route=>{requests.push(route.request().method());if(route.request().method()==='POST'){const body=route.request().postDataJSON();assert.equal(body.action,'group');assert.equal(body.courseId,'fixture');assert.equal(body.paceSeconds,330);seeded.groups.push({groupId:'g2',name:body.name,paceSeconds:body.paceSeconds});return route.fulfill({json:{success:true,data:{saved:true}}});}seeded.serverNow=new Date(epochBase+await page.evaluate(()=>performance.now())).toISOString();return route.fulfill({json:{success:true,data:seeded}});});
  await page.goto(`http://127.0.0.1:${server.address().port}/?live=1`);
  seeded=await page.evaluate(()=>window.__snapshot);epochBase=Date.parse(seeded.serverNow);
  await page.getByRole('heading',{name:'서버 초기 데이터',exact:true}).waitFor();await page.waitForTimeout(250);
+ assert.deepEqual(await page.locator('.tracking-view-nav .tracking-view-choice').evaluateAll(els=>els.slice(0,3).map(e=>({tag:e.tagName,text:e.textContent,className:e.className}))),demoNavigation,'demo and live tracking share the same navigation structure and styling');
  assert.deepEqual(requests,[],'server seeded tracking must not fetch again on mount');
  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  assert.equal(await page.getByText('실제 추적 준비 상태',{exact:true}).count(),0);
