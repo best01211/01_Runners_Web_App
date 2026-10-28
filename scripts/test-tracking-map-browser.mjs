@@ -13,7 +13,7 @@ import React,{useEffect,useState} from 'react';import{createRoot}from'react-dom/
 import TrackingMap from '../../src/components/race-tracking/tracking-map';
 import{DEMO_COURSE,DEMO_START,MockTimingProvider}from'../../src/lib/race-tracking/providers/mock';
 import{trackRunner}from'../../src/lib/race-tracking/engine';
-window.__coursePoints=DEMO_COURSE.points;function App(){const[now,setNow]=useState(DEMO_START+2700000);useEffect(()=>{const timer=setInterval(()=>setNow(n=>n+1000),100);return()=>clearInterval(timer)},[]);const p=new MockTimingProvider();const runner=p.getRunners(now)[0];const state=trackRunner(runner,p.getCheckpoints(runner.bib,now),DEMO_COURSE,now);return <><div style={{height:100}}>모바일 지도 회귀 테스트</div><TrackingMap course={DEMO_COURSE} runners={[state]} selectedId={runner.id} onSelect={()=>{}} revision={0}/><div style={{height:2000}}>아래 내용</div></>};createRoot(document.getElementById('root')!).render(<App/>);
+window.__coursePoints=DEMO_COURSE.points;function App(){const[now,setNow]=useState(DEMO_START+2700000);useEffect(()=>{const timer=setInterval(()=>setNow(n=>n+1000),100);return()=>clearInterval(timer)},[]);const p=new MockTimingProvider();const runner=p.getRunners(now)[0];const state=trackRunner(runner,p.getCheckpoints(runner.bib,now),DEMO_COURSE,now);return <><div style={{height:100}}>모바일 지도 회귀 테스트</div><TrackingMap course={JSON.parse(JSON.stringify(DEMO_COURSE))} additionalCourses={[]} runners={[state]} selectedId={runner.id} onSelect={()=>{}} revision={0}/><div style={{height:2000}}>아래 내용</div></>};createRoot(document.getElementById('root')!).render(<App/>);
 `);
 await build({entryPoints:[path.join(directory,'fixture.tsx')],bundle:true,outfile:path.join(directory,'bundle.js'),format:'esm',loader:{'.png':'dataurl'},jsx:'automatic',define:{'process.env.NODE_ENV':'"development"'},plugins:[{name:'test-leaflet-observer',setup(builder){builder.onResolve({filter:/^leaflet$/},()=>({path:'leaflet-observer',namespace:'qa'}));builder.onLoad({filter:/.*/,namespace:'qa'},()=>({contents:`export * from '${leaflet}';import{map as originalMap}from'${leaflet}';export function map(...args){const result=originalMap(...args);window.__trackingMap=result;return result;}`,loader:'js',resolveDir:process.cwd()}));}}]});
 writeFileSync(path.join(directory,'index.html'),`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/bundle.css"><style>body{margin:0;font-family:sans-serif}.tracking-map{position:relative;overflow:hidden;background:#eee}.tracking-map>div:first-child{height:420px;width:100%}.tracking-map>button,.tracking-map>p{display:none}${css}</style><div id="root"></div><script type="module" src="/bundle.js"></script>`);
@@ -28,6 +28,14 @@ try{
  await page.route('https://tile.openstreetmap.org/**',route=>{tileRequests++;return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#eef0ed"/></svg>'});});
  await page.goto(`http://127.0.0.1:${server.address().port}`);
  await page.waitForSelector('.tracking-runner-marker');await page.waitForFunction(()=>window.__trackingMap?.getZoom()>0);
+ // Simulate API responses rebuilding equal course objects on every update.
+ await page.evaluate(()=>{window.__initialMap=window.__trackingMap;window.__trackingMap.setZoom(14);});
+ await page.waitForTimeout(300);
+ await page.evaluate(()=>{window.__initialTile=document.querySelector('img.leaflet-tile-loaded');});
+ await page.waitForTimeout(1200);
+ assert.equal(await page.evaluate(()=>window.__initialMap===window.__trackingMap),true,'equal course data must preserve the map instance');
+ assert.equal(await page.evaluate(()=>window.__trackingMap.getZoom()),14,'runner/API updates must preserve zoom');
+ assert.equal(await page.evaluate(()=>window.__initialTile?.isConnected),true,'runner updates must retain existing background tiles');
  const client=await context.newCDPSession(page);
  const touch=(type,points)=>client.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(([x,y],id)=>({x,y,id,radiusX:4,radiusY:4,force:1}))});
  const before=await page.evaluate(()=>({lat:window.__trackingMap.getCenter().lat,lng:window.__trackingMap.getCenter().lng}));

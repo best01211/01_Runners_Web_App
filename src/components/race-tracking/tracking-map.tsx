@@ -19,7 +19,13 @@ function reloadBackground(map:Leaflet.Map,layer:Leaflet.TileLayer) {
 }
 
 
-export default function TrackingMap({ course, runners, selectedId, onSelect, revision, compact = false, onPickPoint,cheerDistance,expanded=false,additionalCourses=emptyCourses,runnerCourses }: Props) {
+export default function TrackingMap({ course: incomingCourse, runners, selectedId, onSelect, revision, compact = false, onPickPoint,cheerDistance,expanded=false,additionalCourses: incomingAdditionalCourses=emptyCourses,runnerCourses }: Props) {
+  // API refreshes may return fresh objects with identical coordinates. Only a
+  // changed route should rebuild the map; runner updates keep tiles and view.
+  const courseDefinition=JSON.stringify(incomingCourse);
+  const additionalDefinition=JSON.stringify(incomingAdditionalCourses);
+  const course=useMemo(()=>JSON.parse(courseDefinition) as Course,[courseDefinition]);
+  const additionalCourses=useMemo(()=>JSON.parse(additionalDefinition) as ExtraCourse[],[additionalDefinition]);
   const geometry=useMemo(()=>({course,additionalCourses}),[course,additionalCourses]);
   const pick=useRef(onPickPoint);
   useEffect(()=>{pick.current=onPickPoint;},[onPickPoint]);
