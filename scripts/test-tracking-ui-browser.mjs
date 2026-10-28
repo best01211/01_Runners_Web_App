@@ -33,6 +33,19 @@ try{
  await page.getByRole('button',{name:'전체 종목',exact:true}).click();await page.getByRole('heading',{name:'전체 종목 코스 지도',exact:true}).waitFor();
  await page.locator('.tracking-additional-course-line').waitFor();assert.equal(await page.locator('.tracking-additional-course-line').count(),1);assert.equal(await page.locator('[aria-label="전체 종목 선수 집계"] dd').first().textContent(),'12');
  await page.getByRole('heading',{name:'10K · 6명',exact:true}).waitFor();
+ const allNames=await page.locator('[aria-label="전체 종목 선수 현황"] button > span > strong').allTextContents();
+ assert.equal(new Set(allNames).size,12,'every demo runner must have a distinct name across courses');
+ const coursePanel=page.getByRole('region',{name:'데모 코스 변경'});
+ const demoGpx=Buffer.from('<gpx version="1.1"><trk><trkseg><trkpt lat="35.1" lon="129.1"/><trkpt lat="35.11" lon="129.12"/></trkseg></trk></gpx>');
+ await page.getByLabel('10K GPX 파일',{exact:true}).setInputFiles({name:'demo-test.gpx',mimeType:'application/gpx+xml',buffer:demoGpx});
+ await coursePanel.getByText(/적용된 파일: demo-test.gpx/).waitFor();
+ await page.waitForFunction(()=>document.querySelector('.tracking-additional-course-line')?.getAttribute('d'));
+ await page.getByLabel('10K GPX 파일',{exact:true}).setInputFiles({name:'broken.gpx',mimeType:'application/gpx+xml',buffer:Buffer.from('<gpx>broken')});
+ await coursePanel.getByRole('alert').waitFor();
+ assert.equal(await coursePanel.getByText(/적용된 파일: demo-test.gpx/).count(),1,'invalid GPX preserves the applied course');
+ await coursePanel.getByRole('button',{name:'기본 코스로 복원'}).click();
+ assert.equal(await coursePanel.getByText('기본 코스 사용 중',{exact:true}).count(),2);
+
  await page.getByRole('link',{name:'하프 · 21.0975km',exact:true}).click();await page.getByRole('heading',{name:'선수 현황 · 하프',exact:true}).waitFor();
 
  // Expansion and collapse must retain complete background tile coverage.
