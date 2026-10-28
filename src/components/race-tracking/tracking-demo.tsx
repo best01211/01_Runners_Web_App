@@ -33,14 +33,15 @@ export function TrackingDemo({eventTitle}:{eventTitle?:string}){
  const now=DEMO_START+elapsed*1000;
  const halfCourse=imports["demo-half"]?.course??DEMO_COURSE;
  const shortCourse=imports["demo-10k"]?.course??tenK;
+ // Course geometry must retain its identity while the simulation clock advances.
+ const demoCourses=useMemo(()=>[{raceId:"demo-half",name:"하프",course:halfCourse,names:["김진우","이영희","박철수","정수빈","최민재","한서연"]},{raceId:"demo-10k",name:"10K",course:shortCourse,names:["윤도현","강지민","임준서","오하린","서태훈","배유나"]}].map(c=>({...c,courseInfo:{name:c.name,points:c.course.points,distanceMeters:c.course.distanceMeters,startAt:new Date(DEMO_START).toISOString()}})),[halfCourse,shortCourse]);
  const allSnapshots=useMemo<RaceSnapshot[]>(()=>{
-  const courses=[{raceId:"demo-half",name:"하프",course:halfCourse,names:["김진우","이영희","박철수","정수빈","최민재","한서연"]},{raceId:"demo-10k",name:"10K",course:shortCourse,names:["윤도현","강지민","임준서","오하린","서태훈","배유나"]}];
-  return courses.map(({raceId,name,course,names})=>{
+  return demoCourses.map(({raceId,course,names,courseInfo})=>{
    const originals=provider.getRunners(now);
    const runners=originals.map((r,i)=>({...r,id:`${raceId}-${r.id}`,name:names[i],groupName:i%2?"B그룹":"A그룹",groupPaceSeconds:i%2?360:330,useGroupPrediction:true}));
-   return {raceId,courses:courses.map(c=>({raceId:c.raceId,name:c.name,distanceMeters:c.course.distanceMeters,startAt:new Date(DEMO_START).toISOString()})),serverNow:new Date(now).toISOString(),title:eventTitle??"가상 대회",currentUserId:"demo",canManage:false,courseLocked:true,course:{name,points:course.points,distanceMeters:course.distanceMeters,startAt:new Date(DEMO_START).toISOString()},runners,checkpoints:Object.fromEntries(runners.map((r,i)=>[r.id,provider.getCheckpoints(originals[i].bib,now).filter(c=>c.distanceMeters<=course.distanceMeters).map(c=>({...c,id:`${raceId}-${c.id}`,name:c.distanceMeters===course.distanceMeters?"FINISH":c.name}))])),participants:[],entries:[]};
+   return {raceId,courses:demoCourses.map(c=>({raceId:c.raceId,name:c.name,distanceMeters:c.course.distanceMeters,startAt:new Date(DEMO_START).toISOString()})),serverNow:new Date(now).toISOString(),title:eventTitle??"가상 대회",currentUserId:"demo",canManage:false,courseLocked:true,course:courseInfo,runners,checkpoints:Object.fromEntries(runners.map((r,i)=>[r.id,provider.getCheckpoints(originals[i].bib,now).filter(c=>c.distanceMeters<=course.distanceMeters).map(c=>({...c,id:`${raceId}-${c.id}`,name:c.distanceMeters===course.distanceMeters?"FINISH":c.name}))])),participants:[],entries:[]};
   });
- },[now,halfCourse,shortCourse,eventTitle]);
+ },[now,demoCourses,eventTitle]);
  const data=allSnapshots[short?1:0];
  return <div className="mt-4 space-y-4">
   <aside className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm leading-6"><strong>DEMO · 실제 기록에 저장되지 않습니다</strong><p className="mt-1 text-xs text-zinc-500">실제 대회와 같은 화면으로 가상 선수·계측을 체험합니다. 재생 제어에서 가상 시각을 변경할 수 있습니다. 기본 코스는 서울레이스 GPX를 활용하며, 10K는 체험용으로 자른 경로입니다. 아래에서 종목별 GPX를 변경할 수 있습니다.</p></aside>

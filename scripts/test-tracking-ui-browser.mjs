@@ -48,6 +48,17 @@ try{
 
  await page.getByRole('link',{name:'하프 · 21.0975km',exact:true}).click();await page.getByRole('heading',{name:'선수 현황 · 하프',exact:true}).waitFor();
 
+ // Advancing virtual time must preserve the existing map and user zoom.
+ await page.locator('.leaflet-control-zoom-in').click();
+ const zoomedPath=await page.locator('.tracking-course-line').getAttribute('d');
+ await page.evaluate(()=>{window.__demoMapElement=document.querySelector('.leaflet-container');});
+ await page.locator('.tracking-demo-controls summary').click();
+ await page.getByRole('slider',{name:'가상 대회 진행 시각'}).fill('1200');
+ await page.waitForTimeout(1200);
+ assert.equal(await page.evaluate(()=>window.__demoMapElement===document.querySelector('.leaflet-container')),true,'clock updates must not recreate the map');
+ assert.equal(await page.locator('.tracking-course-line').getAttribute('d'),zoomedPath,'clock updates must preserve zoom');
+ await page.getByRole('slider',{name:'가상 대회 진행 시각'}).fill('900');
+ await page.locator('.tracking-demo-controls summary').click();
  // Expansion and collapse must retain complete background tile coverage.
  const assertTiles=async()=>{await page.waitForFunction(()=>{
   const map=document.querySelector('.leaflet-container');if(!map)return false;
